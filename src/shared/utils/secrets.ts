@@ -3,7 +3,7 @@ import {
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
 
-let client: SecretsManagerClient;
+const client = new SecretsManagerClient({});
 
 interface CacheEntry {
   value: string;
@@ -15,10 +15,6 @@ const cache = new Map<string, CacheEntry>();
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function getSecret(secretArn: string): Promise<string> {
-  if (!client) {
-    client = new SecretsManagerClient({});
-  }
-
   const cached = cache.get(secretArn);
   if (cached && Date.now() < cached.expiry) {
     return cached.value;

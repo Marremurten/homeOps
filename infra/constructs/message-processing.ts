@@ -73,7 +73,7 @@ export class MessageProcessing extends Construct {
 
     props.messagesTable.grant(worker, "dynamodb:PutItem");
     props.messagesTable.grant(worker, "dynamodb:Query");
-    props.activitiesTable.grant(worker, "dynamodb:PutItem", "dynamodb:Query");
+    props.activitiesTable.grant(worker, "dynamodb:PutItem", "dynamodb:Query", "dynamodb:UpdateItem");
     worker.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["dynamodb:Query"],

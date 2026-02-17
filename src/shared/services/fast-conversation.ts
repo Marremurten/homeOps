@@ -1,6 +1,5 @@
-import { DynamoDBClient, QueryCommand } from "@aws-sdk/client-dynamodb";
-
-const client = new DynamoDBClient({});
+import { QueryCommand } from "@aws-sdk/client-dynamodb";
+import { dynamoDBClient as client } from "@shared/utils/dynamodb-client.js";
 
 export async function isConversationFast(
   tableName: string,

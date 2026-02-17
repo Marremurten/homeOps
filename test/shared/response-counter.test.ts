@@ -5,15 +5,16 @@ const { mockSend } = vi.hoisted(() => ({
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: vi.fn().mockImplementation(function () {
-    return { send: mockSend };
-  }),
   GetItemCommand: vi.fn().mockImplementation(function (input: unknown) {
     return { _type: "GetItemCommand", input };
   }),
   UpdateItemCommand: vi.fn().mockImplementation(function (input: unknown) {
     return { _type: "UpdateItemCommand", input };
   }),
+}));
+
+vi.mock("@shared/utils/dynamodb-client.js", () => ({
+  dynamoDBClient: { send: mockSend },
 }));
 
 import {

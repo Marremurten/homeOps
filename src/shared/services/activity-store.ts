@@ -1,8 +1,7 @@
-import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { ulid } from "ulidx";
 import type { ClassificationResult } from "@shared/types/classification.js";
-
-const client = new DynamoDBClient({});
+import { dynamoDBClient as client } from "@shared/utils/dynamodb-client.js";
 
 export interface SaveActivityParams {
   tableName: string;

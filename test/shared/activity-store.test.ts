@@ -6,12 +6,13 @@ const { mockSend } = vi.hoisted(() => ({
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: vi.fn().mockImplementation(function () {
-    return { send: mockSend };
-  }),
   PutItemCommand: vi.fn().mockImplementation(function (input: unknown) {
     return { _type: "PutItemCommand", input };
   }),
+}));
+
+vi.mock("@shared/utils/dynamodb-client.js", () => ({
+  dynamoDBClient: { send: mockSend },
 }));
 
 const { mockUlid } = vi.hoisted(() => ({

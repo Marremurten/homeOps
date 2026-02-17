@@ -17,6 +17,10 @@ vi.mock("@aws-sdk/client-sqs", () => {
   };
 });
 
+vi.mock("@shared/utils/require-env.js", () => ({
+  requireEnv: (name: string) => process.env[name] ?? `MISSING_${name}`,
+}));
+
 // --- Secrets mock setup ---
 
 vi.mock("@shared/utils/secrets.js", () => {

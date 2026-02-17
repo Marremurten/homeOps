@@ -5,12 +5,13 @@ const { mockSend } = vi.hoisted(() => ({
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: vi.fn().mockImplementation(function () {
-    return { send: mockSend };
-  }),
   QueryCommand: vi.fn().mockImplementation(function (input: unknown) {
     return { _type: "QueryCommand", input };
   }),
+}));
+
+vi.mock("@shared/utils/dynamodb-client.js", () => ({
+  dynamoDBClient: { send: mockSend },
 }));
 
 import { isConversationFast } from "@shared/services/fast-conversation.js";

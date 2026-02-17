@@ -1,10 +1,8 @@
 import {
-  DynamoDBClient,
   GetItemCommand,
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
-
-const client = new DynamoDBClient({});
+import { dynamoDBClient as client } from "@shared/utils/dynamodb-client.js";
 
 export async function getResponseCount(
   tableName: string,

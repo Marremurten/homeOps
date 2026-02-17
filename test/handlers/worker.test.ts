@@ -32,13 +32,18 @@ const {
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: vi.fn().mockImplementation(function () {
-    return { send: mockSend };
-  }),
   PutItemCommand: vi.fn().mockImplementation(function (input: unknown) {
     return { input };
   }),
   UpdateItemCommand: MockUpdateItemCommand,
+}));
+
+vi.mock("@shared/utils/dynamodb-client.js", () => ({
+  dynamoDBClient: { send: mockSend },
+}));
+
+vi.mock("@shared/utils/require-env.js", () => ({
+  requireEnv: (name: string) => process.env[name] ?? `MISSING_${name}`,
 }));
 
 vi.mock("@shared/services/classifier.js", () => ({
@@ -556,6 +561,15 @@ describe("Worker Lambda handler", () => {
       const handler = await importHandler();
 
       await expect(handler(makeSqsEvent())).resolves.not.toThrow();
+    });
+
+    it("does not call evaluateResponsePolicy when saveActivity throws", async () => {
+      mockSaveActivity.mockRejectedValue(new Error("DynamoDB write failed"));
+
+      const handler = await importHandler();
+      await handler(makeSqsEvent());
+
+      expect(mockEvaluateResponsePolicy).not.toHaveBeenCalled();
     });
 
     it("reads OPENAI_API_KEY_ARN env var and fetches secret via getSecret", async () => {

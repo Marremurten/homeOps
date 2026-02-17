@@ -1,5 +1,4 @@
 import {
-  DynamoDBClient,
   PutItemCommand,
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
@@ -12,8 +11,8 @@ import { sendMessage, getBotInfo } from "@shared/services/telegram-sender.js";
 import { incrementResponseCount } from "@shared/services/response-counter.js";
 import { getStockholmDate } from "@shared/utils/stockholm-time.js";
 import { getSecret } from "@shared/utils/secrets.js";
-
-const client = new DynamoDBClient({});
+import { dynamoDBClient as client } from "@shared/utils/dynamodb-client.js";
+import { requireEnv } from "@shared/utils/require-env.js";
 
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
   const batchItemFailures: { itemIdentifier: string }[] = [];
@@ -24,7 +23,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
     const ttl = Math.floor(Date.now() / 1000) + 90 * 24 * 60 * 60;
 
     const command = new PutItemCommand({
-      TableName: process.env.MESSAGES_TABLE_NAME,
+      TableName: requireEnv("MESSAGES_TABLE_NAME"),
       ConditionExpression:
         "attribute_not_exists(chatId) AND attribute_not_exists(messageId)",
       Item: {
@@ -59,7 +58,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
     // Step 1: Classify
     let classification;
     try {
-      const apiKey = await getSecret(process.env.OPENAI_API_KEY_ARN!);
+      const apiKey = await getSecret(requireEnv("OPENAI_API_KEY_ARN"));
       classification = await classifyMessage(body.text, apiKey);
     } catch (err) {
       console.error("Classification failed:", err);
@@ -77,7 +76,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
     let activityId: string | undefined;
     try {
       activityId = await saveActivity({
-        tableName: process.env.ACTIVITIES_TABLE_NAME!,
+        tableName: requireEnv("ACTIVITIES_TABLE_NAME"),
         chatId: body.chatId,
         messageId: body.messageId,
         userId: body.userId,
@@ -87,20 +86,21 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
       });
     } catch (err) {
       console.error("saveActivity failed:", err);
+      continue;
     }
 
     // Step 4: Evaluate response policy
     let policyResult;
     try {
-      const token = await getSecret(process.env.TELEGRAM_BOT_TOKEN_ARN!);
+      const token = await getSecret(requireEnv("TELEGRAM_BOT_TOKEN_ARN"));
       const botInfo = await getBotInfo(token);
       policyResult = await evaluateResponsePolicy({
         classification,
         chatId: body.chatId,
         senderUserId: body.userId,
         currentTimestamp: body.timestamp,
-        messagesTableName: process.env.MESSAGES_TABLE_NAME!,
-        countersTableName: process.env.RESPONSE_COUNTERS_TABLE_NAME!,
+        messagesTableName: requireEnv("MESSAGES_TABLE_NAME"),
+        countersTableName: requireEnv("RESPONSE_COUNTERS_TABLE_NAME"),
         botUsername: botInfo.username,
         messageText: body.text,
       });
@@ -114,7 +114,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
     // Step 5: Respond if policy says so
     if (policyResult.respond && policyResult.text) {
       try {
-        const token = await getSecret(process.env.TELEGRAM_BOT_TOKEN_ARN!);
+        const token = await getSecret(requireEnv("TELEGRAM_BOT_TOKEN_ARN"));
         const result = await sendMessage({
           token,
           chatId: Number(body.chatId),
@@ -127,7 +127,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
             new Date(body.timestamp * 1000),
           );
           await incrementResponseCount(
-            process.env.RESPONSE_COUNTERS_TABLE_NAME!,
+            requireEnv("RESPONSE_COUNTERS_TABLE_NAME"),
             body.chatId,
             stockholmDate,
           );
@@ -137,7 +137,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
             try {
               await client.send(
                 new UpdateItemCommand({
-                  TableName: process.env.ACTIVITIES_TABLE_NAME!,
+                  TableName: requireEnv("ACTIVITIES_TABLE_NAME"),
                   Key: {
                     chatId: { S: body.chatId },
                     activityId: { S: activityId },

@@ -79,28 +79,16 @@ export async function evaluateResponsePolicy(params: PolicyParams): Promise<Poli
     messageText !== undefined &&
     messageText.includes(`@${botUsername}`);
 
-  // 6. If directly addressed, generate response regardless of confidence
+  // 6. Determine response text based on confidence
   let text: string;
-  if (directlyAddressed) {
-    if (classification.confidence >= CONFIDENCE_HIGH) {
-      text = "Noterat \u2713";
-    } else if (classification.confidence >= CONFIDENCE_CLARIFY) {
-      text = `Menade du ${classification.activity}?`;
-    } else {
-      // Low confidence but directly addressed - still respond
-      text = `Menade du ${classification.activity}?`;
-    }
+  if (classification.confidence >= CONFIDENCE_HIGH) {
+    text = "Noterat \u2713";
+  } else if (classification.confidence >= CONFIDENCE_CLARIFY) {
+    text = `Menade du ${classification.activity}?`;
+  } else if (directlyAddressed) {
+    text = `Menade du ${classification.activity}?`;
   } else {
-    // 7. High confidence acknowledge
-    if (classification.confidence >= CONFIDENCE_HIGH) {
-      text = "Noterat \u2713";
-    } else if (classification.confidence >= CONFIDENCE_CLARIFY) {
-      // 8. Clarification range
-      text = `Menade du ${classification.activity}?`;
-    } else {
-      // 9. Low confidence
-      return { respond: false, reason: "low_confidence" };
-    }
+    return { respond: false, reason: "low_confidence" };
   }
 
   // 10. Tone validation

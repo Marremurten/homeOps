@@ -1,6 +1,7 @@
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import type { TelegramUpdate } from "@shared/types/telegram.js";
 import { isTextMessage } from "@shared/types/telegram.js";
+import { requireEnv } from "@shared/utils/require-env.js";
 
 let sqs: SQSClient;
 
@@ -14,7 +15,7 @@ export async function handler(event: {
       sqs = new SQSClient({});
     }
     const { getSecret } = await import("@shared/utils/secrets.js");
-    const secret = await getSecret(process.env.WEBHOOK_SECRET_ARN!);
+    const secret = await getSecret(requireEnv("WEBHOOK_SECRET_ARN"));
 
     const token = event.headers["x-telegram-bot-api-secret-token"];
     if (token !== secret) {
@@ -51,7 +52,7 @@ export async function handler(event: {
     }
 
     const command = new SendMessageCommand({
-      QueueUrl: process.env.SQS_QUEUE_URL,
+      QueueUrl: requireEnv("SQS_QUEUE_URL"),
       MessageBody: JSON.stringify(messageBody),
     });
 

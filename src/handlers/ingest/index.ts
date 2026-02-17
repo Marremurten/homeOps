@@ -37,7 +37,7 @@ export async function handler(event: {
     const from = message.from!;
 
     const messageBody: Record<string, unknown> = {
-      chatId: message.chat.id,
+      chatId: String(message.chat.id),
       messageId: message.message_id,
       userId: from.id,
       userName: from.username ?? from.first_name,

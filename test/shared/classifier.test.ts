@@ -11,11 +11,9 @@ const { mockZodResponseFormat } = vi.hoisted(() => ({
 const { MockOpenAI } = vi.hoisted(() => ({
   MockOpenAI: vi.fn().mockImplementation(function () {
     return {
-      beta: {
-        chat: {
-          completions: {
-            parse: mockParse,
-          },
+      chat: {
+        completions: {
+          parse: mockParse,
         },
       },
     };
@@ -72,7 +70,7 @@ describe("classifyMessage", () => {
   });
 
   describe("API call parameters", () => {
-    it("calls client.beta.chat.completions.parse with correct model, temperature, max_completion_tokens, and zodResponseFormat", async () => {
+    it("calls client.chat.completions.parse with correct model, temperature, max_completion_tokens, and zodResponseFormat", async () => {
       mockParse.mockResolvedValueOnce({
         choices: [{ message: { parsed: { type: "chore", activity: "disk", effort: "medium", confidence: 0.92 } } }],
       });

@@ -39,7 +39,11 @@ export async function incrementResponseCount(
       date: { S: date },
     },
     UpdateExpression:
-      "SET updatedAt = :now, lastResponseAt = :now, ttl = :ttl ADD count :inc",
+      "SET updatedAt = :now, lastResponseAt = :now, #ttl = :ttl ADD #count :inc",
+    ExpressionAttributeNames: {
+      "#ttl": "ttl",
+      "#count": "count",
+    },
     ExpressionAttributeValues: {
       ":now": { S: now },
       ":ttl": { N: String(ttl) },

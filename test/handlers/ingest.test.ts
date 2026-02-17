@@ -155,7 +155,7 @@ describe("Ingest Lambda handler", () => {
       const messageBody = JSON.parse(commandCall.MessageBody);
       expect(messageBody).toEqual(
         expect.objectContaining({
-          chatId: 111,
+          chatId: "111",
           messageId: 222,
           userId: 333,
           userName: "alice",

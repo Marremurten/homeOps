@@ -13,6 +13,7 @@ const {
   mockGetBotInfo,
   mockEvaluateResponsePolicy,
   mockGetSecret,
+  MockUpdateItemCommand,
 } = vi.hoisted(() => ({
   mockSend: vi.fn(),
   mockClassifyMessage: vi.fn(),
@@ -25,6 +26,9 @@ const {
   mockGetBotInfo: vi.fn(),
   mockEvaluateResponsePolicy: vi.fn(),
   mockGetSecret: vi.fn(),
+  MockUpdateItemCommand: vi.fn().mockImplementation(function (input: unknown) {
+    return { input };
+  }),
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
@@ -34,6 +38,7 @@ vi.mock("@aws-sdk/client-dynamodb", () => ({
   PutItemCommand: vi.fn().mockImplementation(function (input: unknown) {
     return { input };
   }),
+  UpdateItemCommand: MockUpdateItemCommand,
 }));
 
 vi.mock("@shared/services/classifier.js", () => ({
@@ -68,7 +73,7 @@ function makeSqsEvent(bodyOverrides?: Partial<Record<string, unknown>>): SQSEven
     userId: 111,
     userName: "Test",
     text: "Hello",
-    timestamp: 1234567890000,
+    timestamp: 1234567890,
     ...bodyOverrides,
   };
   return {
@@ -215,7 +220,7 @@ describe("Worker Lambda handler", () => {
       expect(PutItemCommand).toHaveBeenCalledWith(
         expect.objectContaining({
           Item: expect.objectContaining({
-            timestamp: { N: "1234567890000" },
+            timestamp: { N: "1234567890" },
           }),
         }),
       );
@@ -277,6 +282,15 @@ describe("Worker Lambda handler", () => {
     });
   });
 
+  describe("SQSBatchResponse", () => {
+    it("returns empty batchItemFailures on success", async () => {
+      const handler = await importHandler();
+      const result = await handler(makeSqsEvent());
+
+      expect(result).toEqual({ batchItemFailures: [] });
+    });
+  });
+
   describe("ConditionalCheckFailedException handling", () => {
     it("catches ConditionalCheckFailedException and treats as success", async () => {
       const error = new Error("ConditionalCheckFailedException");
@@ -291,14 +305,17 @@ describe("Worker Lambda handler", () => {
   });
 
   describe("other DynamoDB errors", () => {
-    it("throws on non-ConditionalCheckFailedException errors so SQS retries", async () => {
+    it("returns batchItemFailures for non-ConditionalCheckFailedException errors", async () => {
       const error = new Error("Internal server error");
       error.name = "InternalServerError";
       mockSend.mockRejectedValue(error);
 
       const handler = await importHandler();
+      const result = await handler(makeSqsEvent());
 
-      await expect(handler(makeSqsEvent())).rejects.toThrow("Internal server error");
+      expect(result).toEqual({
+        batchItemFailures: [{ itemIdentifier: "sqs-msg-id" }],
+      });
     });
   });
 
@@ -369,7 +386,7 @@ describe("Worker Lambda handler", () => {
             effort: "medium",
             confidence: 0.92,
           },
-          timestamp: 1234567890000,
+          timestamp: 1234567890,
         }),
       );
     });
@@ -428,7 +445,7 @@ describe("Worker Lambda handler", () => {
           },
           chatId: "-100123",
           senderUserId: 111,
-          currentTimestamp: 1234567890000,
+          currentTimestamp: 1234567890,
           messagesTableName: "test-messages-table",
           countersTableName: "test-counters-table",
         }),
@@ -480,6 +497,32 @@ describe("Worker Lambda handler", () => {
       await handler(makeSqsEvent());
 
       expect(mockIncrementResponseCount).toHaveBeenCalled();
+    });
+
+    it("updates activity with botMessageId after successful Telegram send", async () => {
+      mockEvaluateResponsePolicy.mockResolvedValue({
+        respond: true,
+        text: "Noterat ✓",
+      });
+      mockSendTelegramMessage.mockResolvedValue({ ok: true, messageId: 999 });
+      mockSaveActivity.mockResolvedValue("01HTESTACTIVITYID");
+
+      const handler = await importHandler();
+      await handler(makeSqsEvent());
+
+      expect(MockUpdateItemCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          TableName: "test-activities-table",
+          Key: {
+            chatId: { S: "-100123" },
+            activityId: { S: "01HTESTACTIVITYID" },
+          },
+          UpdateExpression: "SET botMessageId = :mid",
+          ExpressionAttributeValues: {
+            ":mid": { N: "999" },
+          },
+        }),
+      );
     });
 
     it("continues without error when classifyMessage throws", async () => {

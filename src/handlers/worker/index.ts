@@ -1,5 +1,9 @@
-import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
-import type { SQSEvent } from "aws-lambda";
+import {
+  DynamoDBClient,
+  PutItemCommand,
+  UpdateItemCommand,
+} from "@aws-sdk/client-dynamodb";
+import type { SQSBatchResponse, SQSEvent } from "aws-lambda";
 import type { MessageBody } from "@shared/types/classification.js";
 import { classifyMessage } from "@shared/services/classifier.js";
 import { saveActivity } from "@shared/services/activity-store.js";
@@ -11,7 +15,9 @@ import { getSecret } from "@shared/utils/secrets.js";
 
 const client = new DynamoDBClient({});
 
-export async function handler(event: SQSEvent): Promise<void> {
+export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
+  const batchItemFailures: { itemIdentifier: string }[] = [];
+
   for (const record of event.Records) {
     const body: MessageBody = JSON.parse(record.body);
     const createdAt = new Date().toISOString();
@@ -43,7 +49,8 @@ export async function handler(event: SQSEvent): Promise<void> {
       ) {
         // Idempotent: item already exists, treat as success
       } else {
-        throw error;
+        batchItemFailures.push({ itemIdentifier: record.messageId });
+        continue;
       }
     }
 
@@ -59,14 +66,17 @@ export async function handler(event: SQSEvent): Promise<void> {
       continue;
     }
 
+    console.log("Classification result:", JSON.stringify(classification));
+
     // Step 2: Skip if type is "none"
     if (classification.type === "none") {
       continue;
     }
 
     // Step 3: Store activity
+    let activityId: string | undefined;
     try {
-      await saveActivity({
+      activityId = await saveActivity({
         tableName: process.env.ACTIVITIES_TABLE_NAME!,
         chatId: body.chatId,
         messageId: body.messageId,
@@ -99,6 +109,8 @@ export async function handler(event: SQSEvent): Promise<void> {
       continue;
     }
 
+    console.log("Policy result:", JSON.stringify(policyResult));
+
     // Step 5: Respond if policy says so
     if (policyResult.respond && policyResult.text) {
       try {
@@ -119,10 +131,33 @@ export async function handler(event: SQSEvent): Promise<void> {
             body.chatId,
             stockholmDate,
           );
+
+          // Update activity with bot message ID
+          if (activityId && result.messageId) {
+            try {
+              await client.send(
+                new UpdateItemCommand({
+                  TableName: process.env.ACTIVITIES_TABLE_NAME!,
+                  Key: {
+                    chatId: { S: body.chatId },
+                    activityId: { S: activityId },
+                  },
+                  UpdateExpression: "SET botMessageId = :mid",
+                  ExpressionAttributeValues: {
+                    ":mid": { N: String(result.messageId) },
+                  },
+                }),
+              );
+            } catch (err) {
+              console.error("botMessageId update failed:", err);
+            }
+          }
         }
       } catch (err) {
         console.error("Telegram send/increment failed:", err);
       }
     }
   }
+
+  return { batchItemFailures };
 }

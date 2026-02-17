@@ -4,12 +4,16 @@
 - Creating "empty" infrastructure for future phases (e.g., empty DynamoDB tables with GSIs for Phase 2)
 - Adding TTL/retention attributes not specified in the PRD's data model
 - These are easy to miss because they "cost nothing" but widen the testing surface
+- Adding helper fields to DB schemas for implementation convenience (e.g., `lastResponseAt` to avoid extra query) -- flag as ACKNOWLEDGED when they support an explicit PRD requirement
+- Extending upstream Lambdas (e.g., ingest handler) to pass metadata needed by downstream logic -- acceptable when it directly supports a PRD requirement like "directly addressed" detection
+- Architectural simplifications that consolidate PRD-specified storage (e.g., merging "response timing" PREF record into PATTERN hourOfDayCounts) -- flag as ACKNOWLEDGED when documented in Decisions Log and the data is still captured
 
 ## Frequently Under-Covered PRD Sections
 - Non-functional requirements (latency targets, error rate thresholds) often lack explicit validation tasks
 - "Store X for future use" requirements (e.g., "OpenAI key stored now, used Phase 2") get partially implemented -- the secret utility is built but the actual secret creation is forgotten
 - Logging requirements that say "all Lambdas" -- plans often only specify logging in the primary handler, not auxiliary ones (health checks, etc.)
 - Alarm specifications: PRDs with multiple alarms (DLQ + error rate) often only get the first one implemented
+- Output format constraints (line length, emoji count) may be implicitly enforced via templates rather than explicit runtime validation -- acceptable for template-only responses but flag if response generation becomes dynamic
 
 ## Verification Edge Cases
 - Stack integration tests that import constructs must depend on construct *impl* tasks, not construct *test* tasks -- wave ordering may mask this
@@ -21,6 +25,7 @@
 - CDK constructs that accept typed props (e.g., Table, Queue) can be coded in parallel even if the plan declares inter-construct dependencies -- the actual wiring happens in the stack task
 - Declared dependencies may be conservative (correct but not strictly necessary for parallel coding); note for executors but do not flag as violations
 - When constructs A -> B -> C are all in the same wave but have declared dependencies, the executor must serialize them within the wave
+- Test tasks in the same wave as their dependency impls require within-wave serialization -- not a violation but must be called out for executors (e.g., Task 7-test needs Task 1-impl, both in Wave 2)
 
 ## Post-Deploy / Manual Verification Pattern
 - Non-functional criteria (latency, deploy/destroy success) that cannot be unit-tested should have a "Post-Deploy Manual Verification" section in the plan

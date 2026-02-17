@@ -16,7 +16,7 @@ const FALLBACK_RESULT: ClassificationResult = {
 
 const SYSTEM_PROMPT = `You are a household activity classifier. Given a message in Swedish, classify it into one of three types: "chore", "recovery", or "none".
 
-- "chore": household tasks or productive activities
+- "chore": household tasks, productive activities, or caregiving (e.g. taking care of children, especially when sick or cranky)
 - "recovery": rest, relaxation, or self-care activities
 - "none": messages that do not describe any activity
 
@@ -35,6 +35,8 @@ Examples:
 - "Tvättade alla kläder idag" -> type: "chore", activity: "tvätta", effort: "medium", confidence: 0.90
 - "Lagade mat till familjen" -> type: "chore", activity: "laga mat", effort: "medium", confidence: 0.91
 - "Dammsugade vardagsrummet" -> type: "chore", activity: "dammsuga", effort: "medium", confidence: 0.93
+- "Tar Ruben till vårdcentralen för att han är sjuk" -> type: "chore", activity: "vårdcentral med barn", effort: "high", confidence: 0.88
+- "Ruben är jättegnällig idag, har fått ta hand om honom hela dagen" -> type: "chore", activity: "ta hand om barn", effort: "high", confidence: 0.90
 - "Vilade på soffan en stund" -> type: "recovery", activity: "vila", effort: "low", confidence: 0.88
 - "Sov en tupplur" -> type: "recovery", activity: "sova", effort: "low", confidence: 0.90
 - "Drack en kopp kaffe i lugn och ro" -> type: "recovery", activity: "kaffe", effort: "low", confidence: 0.85
@@ -50,8 +52,7 @@ export async function classifyMessage(
       timeout: 10_000,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await (client as any).beta.chat.completions.parse({
+    const response = await client.chat.completions.parse({
       model: CLASSIFICATION_MODEL,
       temperature: 0.2,
       max_completion_tokens: 200,

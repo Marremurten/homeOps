@@ -114,7 +114,7 @@ describe("response-counter service", () => {
       await incrementResponseCount(TABLE_NAME, CHAT_ID, DATE);
 
       const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const updateExpr = call.UpdateExpression as string;
 
       expect(updateExpr).toContain("ADD");
@@ -127,7 +127,7 @@ describe("response-counter service", () => {
       await incrementResponseCount(TABLE_NAME, CHAT_ID, DATE);
 
       const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const updateExpr = call.UpdateExpression as string;
 
       expect(updateExpr).toContain("updatedAt");
@@ -139,7 +139,7 @@ describe("response-counter service", () => {
       await incrementResponseCount(TABLE_NAME, CHAT_ID, DATE);
 
       const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const updateExpr = call.UpdateExpression as string;
 
       expect(updateExpr).toContain("lastResponseAt");
@@ -151,7 +151,7 @@ describe("response-counter service", () => {
       await incrementResponseCount(TABLE_NAME, CHAT_ID, DATE);
 
       const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const updateExpr = call.UpdateExpression as string;
 
       expect(updateExpr).toContain("ttl");
@@ -163,7 +163,7 @@ describe("response-counter service", () => {
       await incrementResponseCount(TABLE_NAME, CHAT_ID, DATE);
 
       const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const exprValues = call.ExpressionAttributeValues as Record<string, { N?: string; S?: string }>;
 
       const sevenDaysInSeconds = 7 * 24 * 60 * 60;
@@ -182,7 +182,7 @@ describe("response-counter service", () => {
       await incrementResponseCount(TABLE_NAME, CHAT_ID, DATE);
 
       const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const exprValues = call.ExpressionAttributeValues as Record<string, { N?: string }>;
 
       expect(exprValues[":inc"]).toBeDefined();

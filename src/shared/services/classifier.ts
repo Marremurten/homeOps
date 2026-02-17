@@ -50,7 +50,8 @@ export async function classifyMessage(
       timeout: 10_000,
     });
 
-    const response = await client.beta.chat.completions.parse({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (client as any).beta.chat.completions.parse({
       model: CLASSIFICATION_MODEL,
       temperature: 0.2,
       max_completion_tokens: 200,

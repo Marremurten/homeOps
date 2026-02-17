@@ -1,9 +1,8 @@
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { getSecret } from "@shared/utils/secrets";
 import type { TelegramUpdate } from "@shared/types/telegram";
 import { isTextMessage } from "@shared/types/telegram";
 
-const sqs = new SQSClient({});
+let sqs: InstanceType<typeof SQSClient>;
 
 export async function handler(event: {
   headers: Record<string, string>;
@@ -11,6 +10,10 @@ export async function handler(event: {
   isBase64Encoded: boolean;
 }) {
   try {
+    if (!sqs) {
+      sqs = new SQSClient({});
+    }
+    const { getSecret } = await import("@shared/utils/secrets");
     const secret = await getSecret(process.env.WEBHOOK_SECRET_ARN!);
 
     const token = event.headers["x-telegram-bot-api-secret-token"];

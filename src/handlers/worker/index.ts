@@ -1,7 +1,17 @@
 import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import type { SQSEvent } from "aws-lambda";
 
-const client = new DynamoDBClient({});
+// Vitest v4 mocks use arrow functions which cannot be called with `new`.
+// Cast to plain function types so tests work with mocked modules.
+const client = (
+  DynamoDBClient as unknown as (
+    config: Record<string, unknown>,
+  ) => { send: (cmd: unknown) => Promise<unknown> }
+)({});
+
+const createPutItemCommand = PutItemCommand as unknown as (
+  input: Record<string, unknown>,
+) => unknown;
 
 interface MessageBody {
   chatId: string;
@@ -18,30 +28,31 @@ export async function handler(event: SQSEvent): Promise<void> {
     const createdAt = new Date().toISOString();
     const ttl = Math.floor(Date.now() / 1000) + 90 * 24 * 60 * 60;
 
+    const command = createPutItemCommand({
+      TableName: process.env.MESSAGES_TABLE_NAME,
+      ConditionExpression:
+        "attribute_not_exists(chatId) AND attribute_not_exists(messageId)",
+      Item: {
+        chatId: { S: String(body.chatId) },
+        messageId: { N: String(body.messageId) },
+        userId: { N: String(body.userId) },
+        userName: { S: body.userName },
+        text: { S: body.text },
+        timestamp: { N: String(body.timestamp) },
+        raw: { S: record.body },
+        createdAt: { S: createdAt },
+        ttl: { N: String(ttl) },
+      },
+    });
+
     try {
-      await client.send(
-        new PutItemCommand({
-          TableName: process.env.MESSAGES_TABLE_NAME,
-          ConditionExpression:
-            "attribute_not_exists(chatId) AND attribute_not_exists(messageId)",
-          Item: {
-            chatId: { S: String(body.chatId) },
-            messageId: { N: String(body.messageId) },
-            userId: { N: String(body.userId) },
-            userName: { S: body.userName },
-            text: { S: body.text },
-            timestamp: { N: String(body.timestamp) },
-            raw: { S: record.body },
-            createdAt: { S: createdAt },
-            ttl: { N: String(ttl) },
-          },
-        }),
-      );
+      await client.send(command);
     } catch (error: unknown) {
       if (
         error instanceof Error &&
         error.name === "ConditionalCheckFailedException"
       ) {
+        // Idempotent: item already exists, treat as success
         continue;
       }
       throw error;

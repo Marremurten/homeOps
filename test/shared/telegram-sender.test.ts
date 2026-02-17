@@ -94,6 +94,50 @@ describe("sendMessage", () => {
     expect(result).toHaveProperty("error");
     expect((result as { ok: false; error: string }).error).toContain("Network request failed");
   });
+
+  it("does not include reply_parameters when replyToMessageId is undefined", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 88 } }),
+    });
+
+    await sendMessage({
+      token: "bot-token-123",
+      chatId: 999,
+      text: "No reply context",
+    } as Parameters<typeof sendMessage>[0]);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.chat_id).toBe(999);
+    expect(body.text).toBe("No reply context");
+    expect(body).not.toHaveProperty("reply_parameters");
+  });
+
+  it("includes reply_parameters when replyToMessageId is provided", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 99 } }),
+    });
+
+    await sendMessage({
+      token: "bot-token-123",
+      chatId: 999,
+      text: "With reply context",
+      replyToMessageId: 50,
+    });
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.reply_parameters).toEqual({
+      message_id: 50,
+      allow_sending_without_reply: true,
+    });
+  });
 });
 
 describe("getBotInfo", () => {

@@ -25,15 +25,21 @@ describe("MessageProcessing construct", () => {
       sortKey: { name: "date", type: dynamodb.AttributeType.STRING },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
+    const homeopsTable = new dynamodb.Table(stack, "HomeopsTable", {
+      partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
     const openaiApiKeySecret = new secretsmanager.Secret(stack, "OpenAISecret");
     const telegramBotTokenSecret = new secretsmanager.Secret(stack, "TelegramSecret");
     new MessageProcessing(stack, "TestProcessing", {
       messagesTable: table,
       activitiesTable,
       responseCountersTable,
+      homeopsTable,
       openaiApiKeySecret,
       telegramBotTokenSecret,
-    });
+    } as any);
     template = Template.fromStack(stack);
   });
 
@@ -263,5 +269,102 @@ describe("MessageProcessing construct", () => {
     }
     // Should have at least one statement granting secretsmanager:GetSecretValue
     expect(secretStatements.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("sets HOMEOPS_TABLE_NAME environment variable on Lambda", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({
+          HOMEOPS_TABLE_NAME: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
+  it("sets EMA_ALPHA environment variable on Lambda", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({
+          EMA_ALPHA: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
+  it("sets EMA_ALPHA_IGNORE environment variable on Lambda", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({
+          EMA_ALPHA_IGNORE: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
+  it("grants Lambda IAM role dynamodb:PutItem, GetItem, UpdateItem, Query, DeleteItem on homeops table", () => {
+    const policies = template.findResources("AWS::IAM::Policy");
+    const requiredActions = [
+      "dynamodb:PutItem",
+      "dynamodb:GetItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:Query",
+      "dynamodb:DeleteItem",
+    ];
+
+    for (const action of requiredActions) {
+      const hasAction = Object.values(policies).some((policy: any) => {
+        const statements = policy.Properties?.PolicyDocument?.Statement ?? [];
+        return statements.some((stmt: any) => {
+          const actions = Array.isArray(stmt.Action)
+            ? stmt.Action
+            : [stmt.Action];
+          return actions.some(
+            (a: string) => a === action || a === "dynamodb:*"
+          );
+        });
+      });
+      expect(hasAction, `expected IAM policy to include ${action}`).toBe(true);
+    }
+  });
+
+  it("grants Lambda IAM role dynamodb:Query on activities table GSI", () => {
+    const policies = template.findResources("AWS::IAM::Policy");
+    const queryStatements: any[] = [];
+    for (const policy of Object.values(policies) as any[]) {
+      const statements = policy.Properties?.PolicyDocument?.Statement ?? [];
+      for (const stmt of statements) {
+        const actions = Array.isArray(stmt.Action)
+          ? stmt.Action
+          : [stmt.Action];
+        if (
+          actions.some(
+            (a: string) => a === "dynamodb:Query" || a === "dynamodb:*"
+          )
+        ) {
+          queryStatements.push(stmt);
+        }
+      }
+    }
+    // At least one Query statement should reference a table index ARN (contains /index/)
+    const hasIndexArn = queryStatements.some((stmt: any) => {
+      const resources = Array.isArray(stmt.Resource)
+        ? stmt.Resource
+        : [stmt.Resource];
+      return resources.some((r: any) => {
+        if (typeof r === "string") return r.includes("/index/");
+        // CDK generates Fn::Join ARNs for index resources
+        if (r["Fn::Join"]) {
+          const parts = r["Fn::Join"][1];
+          return parts?.some(
+            (p: any) => typeof p === "string" && p.includes("/index/")
+          );
+        }
+        return false;
+      });
+    });
+    expect(
+      hasIndexArn,
+      "expected at least one dynamodb:Query statement targeting a table index ARN"
+    ).toBe(true);
   });
 });

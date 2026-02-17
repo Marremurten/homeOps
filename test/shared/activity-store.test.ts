@@ -149,4 +149,35 @@ describe("saveActivity", () => {
 
     expect(mockSend).toHaveBeenCalledOnce();
   });
+
+  it("includes activityTimestamp attribute with format activity#timestamp", async () => {
+    mockSend.mockResolvedValueOnce({});
+
+    await saveActivity(BASE_PARAMS);
+
+    const putInput = vi.mocked(PutItemCommand).mock.calls[0][0];
+    const item = putInput.Item!;
+
+    expect(item.activityTimestamp).toEqual({ S: "dishes#1700000000" });
+  });
+
+  it("uses the classification activity and params timestamp for activityTimestamp", async () => {
+    mockSend.mockResolvedValueOnce({});
+
+    await saveActivity({
+      ...BASE_PARAMS,
+      classification: {
+        type: "chore",
+        activity: "vacuuming",
+        effort: "high",
+        confidence: 0.88,
+      },
+      timestamp: 1708200000,
+    });
+
+    const putInput = vi.mocked(PutItemCommand).mock.calls[0][0];
+    const item = putInput.Item!;
+
+    expect(item.activityTimestamp).toEqual({ S: "vacuuming#1708200000" });
+  });
 });

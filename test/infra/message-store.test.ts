@@ -225,6 +225,28 @@ describe("MessageStore construct", () => {
         ]),
       });
     });
+
+    it("has GSI chatId-activity-index with PK chatId (S) and SK activityTimestamp (S)", () => {
+      template.hasResourceProperties("AWS::DynamoDB::Table", {
+        TableName: "homeops-activities",
+        GlobalSecondaryIndexes: Match.arrayWith([
+          Match.objectLike({
+            IndexName: "chatId-activity-index",
+            KeySchema: [
+              { AttributeName: "chatId", KeyType: "HASH" },
+              { AttributeName: "activityTimestamp", KeyType: "RANGE" },
+            ],
+            Projection: {
+              ProjectionType: "ALL",
+            },
+          }),
+        ]),
+        AttributeDefinitions: Match.arrayWith([
+          { AttributeName: "chatId", AttributeType: "S" },
+          { AttributeName: "activityTimestamp", AttributeType: "S" },
+        ]),
+      });
+    });
   });
 
   describe("homeops-response-counters table", () => {

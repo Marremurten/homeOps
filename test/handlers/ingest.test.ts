@@ -298,6 +298,160 @@ describe("Ingest Lambda handler", () => {
     });
   });
 
+  // ---- chatType extraction ----
+
+  describe("chatType extraction", () => {
+    it("includes chatType 'private' in SQS message body for private chats", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = makeTextUpdate(); // default chat.type is "private"
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody.chatType).toBe("private");
+    });
+
+    it("includes chatType 'group' in SQS message body for group chats", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = {
+        update_id: 999,
+        message: {
+          message_id: 100,
+          date: 1700000000,
+          chat: { id: -100123, type: "group" },
+          from: { id: 67890, is_bot: false, first_name: "Test", username: "testuser" },
+          text: "Hello group",
+        },
+      };
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody.chatType).toBe("group");
+    });
+
+    it("includes chatType 'supergroup' in SQS message body for supergroup chats", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = {
+        update_id: 999,
+        message: {
+          message_id: 100,
+          date: 1700000000,
+          chat: { id: -100456, type: "supergroup" },
+          from: { id: 67890, is_bot: false, first_name: "Test", username: "testuser" },
+          text: "Hello supergroup",
+        },
+      };
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody.chatType).toBe("supergroup");
+    });
+  });
+
+  // ---- replyToText extraction ----
+
+  describe("replyToText extraction", () => {
+    it("includes replyToText when reply_to_message has a text field", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = {
+        update_id: 999,
+        message: {
+          message_id: 100,
+          date: 1700000000,
+          chat: { id: 12345, type: "private" },
+          from: { id: 67890, is_bot: false, first_name: "Test", username: "testuser" },
+          text: "My reply",
+          reply_to_message: {
+            message_id: 50,
+            date: 1699999000,
+            chat: { id: 12345, type: "private" },
+            from: { id: 99999, is_bot: true, first_name: "Bot" },
+            text: "Original message text",
+          },
+        },
+      };
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody.replyToText).toBe("Original message text");
+    });
+
+    it("does not include replyToText when reply_to_message has no text field", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = {
+        update_id: 999,
+        message: {
+          message_id: 100,
+          date: 1700000000,
+          chat: { id: 12345, type: "private" },
+          from: { id: 67890, is_bot: false, first_name: "Test", username: "testuser" },
+          text: "Replying to a photo",
+          reply_to_message: {
+            message_id: 50,
+            date: 1699999000,
+            chat: { id: 12345, type: "private" },
+            from: { id: 99999, is_bot: false, first_name: "User" },
+            // no text field — e.g., a photo message
+          },
+        },
+      };
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody).not.toHaveProperty("replyToText");
+    });
+
+    it("does not include replyToText when there is no reply_to_message", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = makeTextUpdate();
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody).not.toHaveProperty("replyToText");
+    });
+  });
+
   // ---- SQS failure ----
 
   describe("SQS failure", () => {

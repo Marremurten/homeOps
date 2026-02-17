@@ -69,7 +69,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
           await sendMessage({
             token,
             chatId: Number(body.chatId),
-            text: "Welcome! You have opted in to direct messages.",
+            text: "Tack! Du kan nu ta emot personliga uppdateringar från mig.",
           });
         } catch (err) {
           console.error("Private /start handling failed:", err);

@@ -54,8 +54,8 @@ describe("dm-status service", () => {
         expect.objectContaining({
           TableName: TABLE_NAME,
           Key: expect.objectContaining({
-            PK: { S: `DM#${USER_ID}` },
-            SK: { S: "STATUS" },
+            pk: { S: `DM#${USER_ID}` },
+            sk: { S: "STATUS" },
           }),
         }),
       );
@@ -73,8 +73,8 @@ describe("dm-status service", () => {
     it("returns optedIn and privateChatId when record exists with opted in", async () => {
       mockSend.mockResolvedValueOnce({
         Item: {
-          PK: { S: `DM#${USER_ID}` },
-          SK: { S: "STATUS" },
+          pk: { S: `DM#${USER_ID}` },
+          sk: { S: "STATUS" },
           optedIn: { BOOL: true },
           privateChatId: { N: String(PRIVATE_CHAT_ID) },
         },
@@ -91,8 +91,8 @@ describe("dm-status service", () => {
     it("returns optedIn false when record exists but not opted in", async () => {
       mockSend.mockResolvedValueOnce({
         Item: {
-          PK: { S: `DM#${USER_ID}` },
-          SK: { S: "STATUS" },
+          pk: { S: `DM#${USER_ID}` },
+          sk: { S: "STATUS" },
           optedIn: { BOOL: false },
         },
       });
@@ -106,8 +106,8 @@ describe("dm-status service", () => {
     it("returns privateChatId as a number", async () => {
       mockSend.mockResolvedValueOnce({
         Item: {
-          PK: { S: `DM#${USER_ID}` },
-          SK: { S: "STATUS" },
+          pk: { S: `DM#${USER_ID}` },
+          sk: { S: "STATUS" },
           optedIn: { BOOL: true },
           privateChatId: { N: "99999" },
         },
@@ -147,8 +147,8 @@ describe("dm-status service", () => {
       const { PutItemCommand } = await import("@aws-sdk/client-dynamodb");
       const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string }>;
-      expect(item.PK).toEqual({ S: `DM#${USER_ID}` });
-      expect(item.SK).toEqual({ S: "STATUS" });
+      expect(item.pk).toEqual({ S: `DM#${USER_ID}` });
+      expect(item.sk).toEqual({ S: "STATUS" });
     });
 
     it("sets optedIn to true", async () => {
@@ -213,8 +213,8 @@ describe("dm-status service", () => {
         expect.objectContaining({
           TableName: TABLE_NAME,
           Key: expect.objectContaining({
-            PK: { S: `DM#${USER_ID}` },
-            SK: { S: "STATUS" },
+            pk: { S: `DM#${USER_ID}` },
+            sk: { S: "STATUS" },
           }),
         }),
       );

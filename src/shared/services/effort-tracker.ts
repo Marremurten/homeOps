@@ -45,6 +45,7 @@ export async function updateEffortEma(
 ): Promise<void> {
   const alpha = Number(process.env.EMA_ALPHA ?? "0.3");
   const effortValue = EFFORT_VALUES[effort];
+  if (effortValue === undefined) return;
 
   const current = await getEffortEma(tableName, userId, activity);
 
@@ -73,6 +74,8 @@ export async function updateEffortEma(
       sk: { S: activity },
       ema: { N: String(newEma) },
       sampleCount: { N: String(newSampleCount) },
+      lastEffort: { S: effort },
+      updatedAt: { S: new Date().toISOString() },
     },
     ConditionExpression: conditionExpression,
     ...(expressionAttributeValues && { ExpressionAttributeValues: expressionAttributeValues }),

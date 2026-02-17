@@ -9,7 +9,7 @@ Created: 2026-02-17
 |---|------|------------|--------|------------|
 | 1 | Infrastructure & Telegram Ingestion | homeops-p1-infra | done | — |
 | 2 | Message Understanding & Activity Logging | homeops-p2-classification | done | Phase 1 |
-| 3 | Memory System & Learning | homeops-p3-learning | pending | Phase 2 |
+| 3 | Memory System & Learning | homeops-p3-learning | done | Phase 2 |
 | 4 | Balance, Fairness & Dispute Resolution | homeops-p4-balance | pending | Phase 3 |
 | 5 | Promise Engine & Proactive Behavior | homeops-p5-promises | pending | Phase 4 |
 | 6 | DM Insights & Adaptive Intelligence | homeops-p6-insights | pending | Phase 5 |

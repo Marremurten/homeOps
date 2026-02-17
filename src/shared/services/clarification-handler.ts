@@ -24,7 +24,7 @@ export async function handleClarificationReply(params: {
   userReplyText: string;
   apiKey: string;
 }): Promise<ClarificationResult> {
-  const { tableName, chatId, userId, replyToText, userReplyText, apiKey } = params;
+  const { tableName, chatId, replyToText, userReplyText, apiKey } = params;
 
   // Extract suggested activity from bot message
   const match = replyToText.match(CLARIFICATION_REGEX);

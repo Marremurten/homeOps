@@ -22,10 +22,6 @@ const CHAT_ID = "-100123456";
 const USER_ID = "7890";
 const ACTIVITY = "dishes";
 
-// 2026-02-17 is a Tuesday. 12:00 UTC = 13:00 Stockholm (CET, UTC+1)
-const TUESDAY_NOON_UTC = 1739793600; // 2026-02-17T12:00:00Z (unix seconds)
-// Convert to ISO for verification: new Date(1739793600 * 1000).toISOString() = "2025-02-17T12:00:00.000Z"
-// Actually, let me use a known date string instead for clarity.
 // 2026-02-17T12:00:00Z — Tuesday, 13:00 Stockholm time (CET, UTC+1)
 const TUESDAY_NOON_ISO = "2026-02-17T12:00:00.000Z";
 const TUESDAY_NOON_EPOCH_MS = new Date(TUESDAY_NOON_ISO).getTime();

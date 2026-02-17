@@ -17,8 +17,8 @@ export async function getDmStatus(
   const command = new GetItemCommand({
     TableName: tableName,
     Key: {
-      PK: { S: `DM#${userId}` },
-      SK: { S: "STATUS" },
+      pk: { S: `DM#${userId}` },
+      sk: { S: "STATUS" },
     },
   });
 
@@ -47,11 +47,12 @@ export async function setDmOptedIn(
   const command = new PutItemCommand({
     TableName: tableName,
     Item: {
-      PK: { S: `DM#${userId}` },
-      SK: { S: "STATUS" },
+      pk: { S: `DM#${userId}` },
+      sk: { S: "STATUS" },
       optedIn: { BOOL: true },
       privateChatId: { N: String(privateChatId) },
       optedInAt: { S: new Date().toISOString() },
+      updatedAt: { S: new Date().toISOString() },
     },
   });
 
@@ -65,8 +66,8 @@ export async function markPrompted(
   const command = new UpdateItemCommand({
     TableName: tableName,
     Key: {
-      PK: { S: `DM#${userId}` },
-      SK: { S: "STATUS" },
+      pk: { S: `DM#${userId}` },
+      sk: { S: "STATUS" },
     },
     UpdateExpression: "SET prompted = :prompted",
     ExpressionAttributeValues: {

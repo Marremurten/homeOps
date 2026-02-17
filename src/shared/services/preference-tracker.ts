@@ -34,40 +34,50 @@ export async function updateIgnoreRate(
   const newValue = ignored ? 1.0 : 0.0;
   const alpha = getAlpha();
 
-  if (existing.Item) {
-    const oldRate = Number(existing.Item.rate.N);
-    const oldCount = Number(existing.Item.sampleCount.N);
-    const rate = round4(alpha * newValue + (1 - alpha) * oldRate);
-    const newCount = oldCount + 1;
+  try {
+    if (existing.Item) {
+      const oldRate = Number(existing.Item.rate.N);
+      const oldCount = Number(existing.Item.sampleCount.N);
+      const rate = round4(alpha * newValue + (1 - alpha) * oldRate);
+      const newCount = oldCount + 1;
 
-    await client.send(
-      new PutItemCommand({
-        TableName: tableName,
-        Item: {
-          pk: { S: pk },
-          sk: { S: sk },
-          rate: { N: String(rate) },
-          sampleCount: { N: String(newCount) },
-        },
-        ConditionExpression: "sampleCount = :expected",
-        ExpressionAttributeValues: {
-          ":expected": { N: String(oldCount) },
-        },
-      }),
-    );
-  } else {
-    await client.send(
-      new PutItemCommand({
-        TableName: tableName,
-        Item: {
-          pk: { S: pk },
-          sk: { S: sk },
-          rate: { N: String(newValue) },
-          sampleCount: { N: "1" },
-        },
-        ConditionExpression: "attribute_not_exists(pk)",
-      }),
-    );
+      await client.send(
+        new PutItemCommand({
+          TableName: tableName,
+          Item: {
+            pk: { S: pk },
+            sk: { S: sk },
+            rate: { N: String(rate) },
+            sampleCount: { N: String(newCount) },
+            updatedAt: { S: new Date().toISOString() },
+          },
+          ConditionExpression: "sampleCount = :expected",
+          ExpressionAttributeValues: {
+            ":expected": { N: String(oldCount) },
+          },
+        }),
+      );
+    } else {
+      await client.send(
+        new PutItemCommand({
+          TableName: tableName,
+          Item: {
+            pk: { S: pk },
+            sk: { S: sk },
+            rate: { N: String(newValue) },
+            sampleCount: { N: "1" },
+            updatedAt: { S: new Date().toISOString() },
+          },
+          ConditionExpression: "attribute_not_exists(pk)",
+        }),
+      );
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "ConditionalCheckFailedException") {
+      console.warn(`Optimistic lock failed for PREF#${userId}/ignoreRate, skipping update`);
+      return;
+    }
+    throw error;
   }
 }
 
@@ -113,42 +123,58 @@ export async function updateInteractionFrequency(
 
   const alpha = getAlpha();
 
-  if (existing.Item) {
-    const oldFrequency = Number(existing.Item.frequency.N);
-    const oldCount = Number(existing.Item.sampleCount.N);
-    const frequency = round4(alpha * messageCount + (1 - alpha) * oldFrequency);
-    const newCount = oldCount + 1;
+  try {
+    if (existing.Item) {
+      const lastDate = existing.Item.lastDate?.S;
+      if (lastDate === today) {
+        // Same Stockholm date — already counted today, skip EMA update
+        return;
+      }
 
-    await client.send(
-      new PutItemCommand({
-        TableName: tableName,
-        Item: {
-          pk: { S: pk },
-          sk: { S: sk },
-          frequency: { N: String(frequency) },
-          sampleCount: { N: String(newCount) },
-          lastDate: { S: today },
-        },
-        ConditionExpression: "sampleCount = :expected",
-        ExpressionAttributeValues: {
-          ":expected": { N: String(oldCount) },
-        },
-      }),
-    );
-  } else {
-    await client.send(
-      new PutItemCommand({
-        TableName: tableName,
-        Item: {
-          pk: { S: pk },
-          sk: { S: sk },
-          frequency: { N: String(messageCount) },
-          sampleCount: { N: "1" },
-          lastDate: { S: today },
-        },
-        ConditionExpression: "attribute_not_exists(pk)",
-      }),
-    );
+      const oldFrequency = Number(existing.Item.frequency.N);
+      const oldCount = Number(existing.Item.sampleCount.N);
+      const frequency = round4(alpha * messageCount + (1 - alpha) * oldFrequency);
+      const newCount = oldCount + 1;
+
+      await client.send(
+        new PutItemCommand({
+          TableName: tableName,
+          Item: {
+            pk: { S: pk },
+            sk: { S: sk },
+            frequency: { N: String(frequency) },
+            sampleCount: { N: String(newCount) },
+            lastDate: { S: today },
+            updatedAt: { S: new Date().toISOString() },
+          },
+          ConditionExpression: "sampleCount = :expected",
+          ExpressionAttributeValues: {
+            ":expected": { N: String(oldCount) },
+          },
+        }),
+      );
+    } else {
+      await client.send(
+        new PutItemCommand({
+          TableName: tableName,
+          Item: {
+            pk: { S: pk },
+            sk: { S: sk },
+            frequency: { N: String(messageCount) },
+            sampleCount: { N: "1" },
+            lastDate: { S: today },
+            updatedAt: { S: new Date().toISOString() },
+          },
+          ConditionExpression: "attribute_not_exists(pk)",
+        }),
+      );
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "ConditionalCheckFailedException") {
+      console.warn(`Optimistic lock failed for PREF#${userId}/interactionFrequency, skipping update`);
+      return;
+    }
+    throw error;
   }
 }
 

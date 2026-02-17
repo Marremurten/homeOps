@@ -44,7 +44,7 @@ export async function resolveAliases(
   let resolvedText = text;
 
   for (const [alias, canonical] of aliasMap) {
-    const pattern = new RegExp(`\\b${escapeRegex(alias)}\\b`, "gi");
+    const pattern = new RegExp(`(?<=\\s|^)${escapeRegex(alias)}(?=\\s|$)`, "gi");
     if (pattern.test(resolvedText)) {
       resolvedText = resolvedText.replace(pattern, canonical);
       appliedAliases.push({ alias, canonicalActivity: canonical });

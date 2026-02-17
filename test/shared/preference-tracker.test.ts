@@ -19,7 +19,6 @@ vi.mock("@shared/utils/dynamodb-client.js", () => ({
 
 const TABLE_NAME = "HomeOps-Preferences";
 const USER_ID = "12345";
-const ALPHA = 0.2;
 
 describe("preference-tracker", () => {
   let updateIgnoreRate: typeof import("@shared/services/preference-tracker.js").updateIgnoreRate;
@@ -243,12 +242,23 @@ describe("preference-tracker", () => {
       expect(Number(item.rate.N)).toBe(0.6);
     });
 
-    it("throws when DynamoDB put fails", async () => {
+    it("handles ConditionalCheckFailedException gracefully without throwing", async () => {
       mockSend.mockResolvedValueOnce({});
-      mockSend.mockRejectedValueOnce(new Error("ConditionalCheckFailedException"));
+      const error = new Error("ConditionalCheckFailedException");
+      error.name = "ConditionalCheckFailedException";
+      mockSend.mockRejectedValueOnce(error);
+
+      await expect(
+        updateIgnoreRate(TABLE_NAME, USER_ID, true),
+      ).resolves.not.toThrow();
+    });
+
+    it("throws when DynamoDB put fails with non-conditional error", async () => {
+      mockSend.mockResolvedValueOnce({});
+      mockSend.mockRejectedValueOnce(new Error("InternalServerError"));
 
       await expect(updateIgnoreRate(TABLE_NAME, USER_ID, true)).rejects.toThrow(
-        "ConditionalCheckFailedException",
+        "InternalServerError",
       );
     });
   });
@@ -415,13 +425,46 @@ describe("preference-tracker", () => {
       expect(condExpr).toContain("sampleCount");
     });
 
-    it("throws when DynamoDB put fails", async () => {
+    it("handles ConditionalCheckFailedException gracefully without throwing", async () => {
       mockSend.mockResolvedValueOnce({});
-      mockSend.mockRejectedValueOnce(new Error("ConditionalCheckFailedException"));
+      const error = new Error("ConditionalCheckFailedException");
+      error.name = "ConditionalCheckFailedException";
+      mockSend.mockRejectedValueOnce(error);
 
       await expect(
         updateInteractionFrequency(TABLE_NAME, USER_ID, 5),
-      ).rejects.toThrow("ConditionalCheckFailedException");
+      ).resolves.not.toThrow();
+    });
+
+    it("throws when DynamoDB put fails with non-conditional error", async () => {
+      mockSend.mockResolvedValueOnce({});
+      mockSend.mockRejectedValueOnce(new Error("InternalServerError"));
+
+      await expect(
+        updateInteractionFrequency(TABLE_NAME, USER_ID, 5),
+      ).rejects.toThrow("InternalServerError");
+    });
+
+    it("skips EMA update when lastDate matches today (same Stockholm date)", async () => {
+      // Existing record with today's date
+      const { getStockholmDate } = await import("@shared/utils/stockholm-time.js");
+      const today = getStockholmDate();
+
+      mockSend.mockResolvedValueOnce({
+        Item: {
+          pk: { S: `PREF#${USER_ID}` },
+          sk: { S: "interactionFrequency" },
+          frequency: { N: "5" },
+          sampleCount: { N: "3" },
+          lastDate: { S: today },
+        },
+      });
+
+      await updateInteractionFrequency(TABLE_NAME, USER_ID, 1);
+
+      // Only GetItem should be called, no PutItem
+      expect(mockSend).toHaveBeenCalledOnce();
+      expect(PutItemCommand).not.toHaveBeenCalled();
     });
 
     it("uses alpha from EMA_ALPHA_IGNORE env var", async () => {

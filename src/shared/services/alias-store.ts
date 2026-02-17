@@ -19,7 +19,7 @@ export async function getAliasesForChat(
 ): Promise<AliasRecord[]> {
   const command = new QueryCommand({
     TableName: tableName,
-    KeyConditionExpression: "PK = :pk",
+    KeyConditionExpression: "pk = :pk",
     ExpressionAttributeValues: {
       ":pk": { S: `ALIAS#${chatId}` },
     },
@@ -29,7 +29,7 @@ export async function getAliasesForChat(
   const items = result.Items ?? [];
 
   return items.map((item) => ({
-    alias: item.SK?.S ?? "",
+    alias: item.sk?.S ?? "",
     canonicalActivity: item.canonicalActivity?.S ?? "",
     confirmations: Number(item.confirmations?.N ?? "0"),
     source: item.source?.S ?? "",
@@ -45,16 +45,19 @@ export interface PutAliasParams {
 }
 
 export async function putAlias(params: PutAliasParams): Promise<void> {
+  const now = new Date().toISOString();
   const command = new PutItemCommand({
     TableName: params.tableName,
     Item: {
-      PK: { S: `ALIAS#${params.chatId}` },
-      SK: { S: params.alias },
+      pk: { S: `ALIAS#${params.chatId}` },
+      sk: { S: params.alias },
       canonicalActivity: { S: params.canonicalActivity },
       source: { S: params.source },
       confirmations: { N: "0" },
-      GSI1PK: { S: `ALIAS#${params.canonicalActivity}` },
-      GSI1SK: { S: `${params.chatId}#${params.alias}` },
+      gsi1pk: { S: `ALIASES_BY_ACTIVITY#${params.chatId}` },
+      gsi1sk: { S: params.canonicalActivity },
+      createdAt: { S: now },
+      updatedAt: { S: now },
     },
   });
 
@@ -69,12 +72,13 @@ export async function incrementConfirmation(
   const command = new UpdateItemCommand({
     TableName: tableName,
     Key: {
-      PK: { S: `ALIAS#${chatId}` },
-      SK: { S: alias },
+      pk: { S: `ALIAS#${chatId}` },
+      sk: { S: alias },
     },
-    UpdateExpression: "ADD confirmations :inc",
+    UpdateExpression: "ADD confirmations :inc SET updatedAt = :now",
     ExpressionAttributeValues: {
       ":inc": { N: "1" },
+      ":now": { S: new Date().toISOString() },
     },
   });
 
@@ -89,8 +93,8 @@ export async function deleteAlias(
   const command = new DeleteItemCommand({
     TableName: tableName,
     Key: {
-      PK: { S: `ALIAS#${chatId}` },
-      SK: { S: alias },
+      pk: { S: `ALIAS#${chatId}` },
+      sk: { S: alias },
     },
   });
 

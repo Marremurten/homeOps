@@ -88,8 +88,8 @@ describe("alias-store", () => {
       mockSend.mockResolvedValueOnce({
         Items: [
           {
-            PK: { S: `ALIAS#${CHAT_ID}` },
-            SK: { S: "disk" },
+            pk: { S: `ALIAS#${CHAT_ID}` },
+            sk: { S: "disk" },
             canonicalActivity: { S: "diskning" },
             confirmations: { N: "3" },
             source: { S: "seed" },
@@ -112,15 +112,15 @@ describe("alias-store", () => {
       mockSend.mockResolvedValueOnce({
         Items: [
           {
-            PK: { S: `ALIAS#${CHAT_ID}` },
-            SK: { S: "disk" },
+            pk: { S: `ALIAS#${CHAT_ID}` },
+            sk: { S: "disk" },
             canonicalActivity: { S: "diskning" },
             confirmations: { N: "5" },
             source: { S: "seed" },
           },
           {
-            PK: { S: `ALIAS#${CHAT_ID}` },
-            SK: { S: "sopor" },
+            pk: { S: `ALIAS#${CHAT_ID}` },
+            sk: { S: "sopor" },
             canonicalActivity: { S: "sophantering" },
             confirmations: { N: "1" },
             source: { S: "learned" },
@@ -178,7 +178,7 @@ describe("alias-store", () => {
       await putAlias(ALIAS_PARAMS);
 
       const putInput = vi.mocked(PutItemCommand).mock.calls[0][0];
-      expect(putInput.Item?.PK).toEqual({ S: `ALIAS#${CHAT_ID}` });
+      expect(putInput.Item?.pk).toEqual({ S: `ALIAS#${CHAT_ID}` });
     });
 
     it("sets SK to the alias string", async () => {
@@ -187,7 +187,7 @@ describe("alias-store", () => {
       await putAlias(ALIAS_PARAMS);
 
       const putInput = vi.mocked(PutItemCommand).mock.calls[0][0];
-      expect(putInput.Item?.SK).toEqual({ S: "sopor" });
+      expect(putInput.Item?.sk).toEqual({ S: "sopor" });
     });
 
     it("includes canonicalActivity and source attributes", async () => {
@@ -207,8 +207,8 @@ describe("alias-store", () => {
 
       const putInput = vi.mocked(PutItemCommand).mock.calls[0][0];
       // GSI1 attributes should be present for the alias lookup pattern
-      expect(putInput.Item).toHaveProperty("GSI1PK");
-      expect(putInput.Item).toHaveProperty("GSI1SK");
+      expect(putInput.Item).toHaveProperty("gsi1pk");
+      expect(putInput.Item).toHaveProperty("gsi1sk");
     });
 
     it("initializes confirmations to 0 for new aliases", async () => {
@@ -246,8 +246,8 @@ describe("alias-store", () => {
       expect(UpdateItemCommand).toHaveBeenCalledOnce();
       const updateInput = vi.mocked(UpdateItemCommand).mock.calls[0][0];
       expect(updateInput.TableName).toBe(TABLE_NAME);
-      expect(updateInput.Key?.PK).toEqual({ S: `ALIAS#${CHAT_ID}` });
-      expect(updateInput.Key?.SK).toEqual({ S: "disk" });
+      expect(updateInput.Key?.pk).toEqual({ S: `ALIAS#${CHAT_ID}` });
+      expect(updateInput.Key?.sk).toEqual({ S: "disk" });
     });
 
     it("uses ADD confirmations :inc in the update expression", async () => {
@@ -298,8 +298,8 @@ describe("alias-store", () => {
       expect(DeleteItemCommand).toHaveBeenCalledOnce();
       const deleteInput = vi.mocked(DeleteItemCommand).mock.calls[0][0];
       expect(deleteInput.TableName).toBe(TABLE_NAME);
-      expect(deleteInput.Key?.PK).toEqual({ S: `ALIAS#${CHAT_ID}` });
-      expect(deleteInput.Key?.SK).toEqual({ S: "sopor" });
+      expect(deleteInput.Key?.pk).toEqual({ S: `ALIAS#${CHAT_ID}` });
+      expect(deleteInput.Key?.sk).toEqual({ S: "sopor" });
     });
 
     it("calls send exactly once", async () => {

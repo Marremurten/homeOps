@@ -29,6 +29,7 @@ export async function saveActivity(params: SaveActivityParams): Promise<string> 
     confidence: { N: String(params.classification.confidence) },
     timestamp: { N: String(params.timestamp) },
     createdAt: { S: new Date().toISOString() },
+    activityTimestamp: { S: `${params.classification.activity}#${params.timestamp}` },
   };
 
   if (params.botMessageId !== undefined) {

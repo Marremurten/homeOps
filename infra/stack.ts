@@ -29,6 +29,7 @@ export class HomeOpsStack extends cdk.Stack {
       messagesTable: store.messagesTable,
       activitiesTable: store.activitiesTable,
       responseCountersTable: store.responseCountersTable,
+      homeopsTable: store.homeopsTable,
       openaiApiKeySecret: openAiApiKeySecret,
       telegramBotTokenSecret: botTokenSecret,
     });

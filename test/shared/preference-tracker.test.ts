@@ -56,7 +56,7 @@ describe("preference-tracker", () => {
       await updateIgnoreRate(TABLE_NAME, USER_ID, true);
 
       expect(PutItemCommand).toHaveBeenCalledOnce();
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.rate.N)).toBe(1);
       expect(Number(item.sampleCount.N)).toBe(1);
@@ -68,7 +68,7 @@ describe("preference-tracker", () => {
 
       await updateIgnoreRate(TABLE_NAME, USER_ID, false);
 
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.rate.N)).toBe(0);
       expect(Number(item.sampleCount.N)).toBe(1);
@@ -90,7 +90,7 @@ describe("preference-tracker", () => {
 
       // EMA: alpha * newValue + (1 - alpha) * oldRate
       // 0.2 * 1 + 0.8 * 0.5 = 0.2 + 0.4 = 0.6
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.rate.N)).toBe(0.6);
       expect(Number(item.sampleCount.N)).toBe(4);
@@ -111,7 +111,7 @@ describe("preference-tracker", () => {
       await updateIgnoreRate(TABLE_NAME, USER_ID, false);
 
       // EMA: 0.2 * 0 + 0.8 * 0.5 = 0 + 0.4 = 0.4
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.rate.N)).toBe(0.4);
       expect(Number(item.sampleCount.N)).toBe(4);
@@ -132,7 +132,7 @@ describe("preference-tracker", () => {
       await updateIgnoreRate(TABLE_NAME, USER_ID, true);
 
       // EMA: 0.2 * 1 + 0.8 * 0.3333 = 0.2 + 0.26664 = 0.46664 -> rounds to 0.4666
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.rate.N)).toBe(0.4666);
     });
@@ -155,7 +155,7 @@ describe("preference-tracker", () => {
       );
 
       // Check PutItemCommand uses correct key
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(item.pk).toEqual({ S: `PREF#${USER_ID}` });
       expect(item.sk).toEqual({ S: "ignoreRate" });
@@ -174,7 +174,7 @@ describe("preference-tracker", () => {
 
       await updateIgnoreRate(TABLE_NAME, USER_ID, true);
 
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       // Optimistic locking: ConditionExpression should check sampleCount matches expected value
       expect(putInput).toHaveProperty("ConditionExpression");
       const condExpr = putInput.ConditionExpression as string;
@@ -187,7 +187,7 @@ describe("preference-tracker", () => {
 
       await updateIgnoreRate(TABLE_NAME, USER_ID, false);
 
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       // For new items, condition should check attribute_not_exists OR no condition
       // Either no ConditionExpression, or one that checks the item doesn't exist
       const condExpr = putInput.ConditionExpression as string | undefined;
@@ -215,7 +215,7 @@ describe("preference-tracker", () => {
       await mod.updateIgnoreRate(TABLE_NAME, USER_ID, true);
 
       // EMA with alpha=0.5: 0.5 * 1 + 0.5 * 0.4 = 0.5 + 0.2 = 0.7
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.rate.N)).toBe(0.7);
     });
@@ -238,7 +238,7 @@ describe("preference-tracker", () => {
       await mod.updateIgnoreRate(TABLE_NAME, USER_ID, true);
 
       // EMA with alpha=0.2: 0.2 * 1 + 0.8 * 0.5 = 0.6
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.rate.N)).toBe(0.6);
     });
@@ -312,7 +312,7 @@ describe("preference-tracker", () => {
 
       await updateInteractionFrequency(TABLE_NAME, USER_ID, 5);
 
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.frequency.N)).toBe(5);
       expect(Number(item.sampleCount.N)).toBe(1);
@@ -333,7 +333,7 @@ describe("preference-tracker", () => {
       await updateInteractionFrequency(TABLE_NAME, USER_ID, 8);
 
       // EMA: 0.2 * 8 + 0.8 * 10 = 1.6 + 8 = 9.6
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.frequency.N)).toBe(9.6);
       expect(Number(item.sampleCount.N)).toBe(5);
@@ -354,7 +354,7 @@ describe("preference-tracker", () => {
       await updateInteractionFrequency(TABLE_NAME, USER_ID, 7);
 
       // EMA: 0.2 * 7 + 0.8 * 3.3333 = 1.4 + 2.66664 = 4.06664 -> rounds to 4.0666
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.frequency.N)).toBe(4.0666);
     });
@@ -375,7 +375,7 @@ describe("preference-tracker", () => {
         }),
       );
 
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(item.pk).toEqual({ S: `PREF#${USER_ID}` });
       expect(item.sk).toEqual({ S: "interactionFrequency" });
@@ -387,7 +387,7 @@ describe("preference-tracker", () => {
 
       await updateInteractionFrequency(TABLE_NAME, USER_ID, 3);
 
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(item.lastDate).toBeDefined();
       expect(item.lastDate.S).toBeDefined();
@@ -409,7 +409,7 @@ describe("preference-tracker", () => {
 
       await updateInteractionFrequency(TABLE_NAME, USER_ID, 4);
 
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       expect(putInput).toHaveProperty("ConditionExpression");
       const condExpr = putInput.ConditionExpression as string;
       expect(condExpr).toContain("sampleCount");
@@ -443,7 +443,7 @@ describe("preference-tracker", () => {
       await mod.updateInteractionFrequency(TABLE_NAME, USER_ID, 4);
 
       // EMA with alpha=0.3: 0.3 * 4 + 0.7 * 10 = 1.2 + 7 = 8.2
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string; N?: string }>;
       expect(Number(item.frequency.N)).toBe(8.2);
     });

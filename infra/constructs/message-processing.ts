@@ -7,6 +7,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 
@@ -16,6 +17,7 @@ export interface MessageProcessingProps {
   messagesTable: dynamodb.ITable;
   activitiesTable: dynamodb.ITable;
   responseCountersTable: dynamodb.ITable;
+  homeopsTable: dynamodb.ITable;
   openaiApiKeySecret: secretsmanager.ISecret;
   telegramBotTokenSecret: secretsmanager.ISecret;
 }
@@ -54,6 +56,9 @@ export class MessageProcessing extends Construct {
         MESSAGES_TABLE_NAME: props.messagesTable.tableName,
         ACTIVITIES_TABLE_NAME: props.activitiesTable.tableName,
         RESPONSE_COUNTERS_TABLE_NAME: props.responseCountersTable.tableName,
+        HOMEOPS_TABLE_NAME: props.homeopsTable.tableName,
+        EMA_ALPHA: "0.3",
+        EMA_ALPHA_IGNORE: "0.2",
         OPENAI_API_KEY_ARN: props.openaiApiKeySecret.secretArn,
         TELEGRAM_BOT_TOKEN_ARN: props.telegramBotTokenSecret.secretArn,
       },
@@ -68,8 +73,15 @@ export class MessageProcessing extends Construct {
 
     props.messagesTable.grant(worker, "dynamodb:PutItem");
     props.messagesTable.grant(worker, "dynamodb:Query");
-    props.activitiesTable.grant(worker, "dynamodb:PutItem");
+    props.activitiesTable.grant(worker, "dynamodb:PutItem", "dynamodb:Query");
+    worker.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:Query"],
+        resources: [`${props.activitiesTable.tableArn}/index/*`],
+      }),
+    );
     props.responseCountersTable.grant(worker, "dynamodb:GetItem", "dynamodb:UpdateItem");
+    props.homeopsTable.grant(worker, "dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query", "dynamodb:DeleteItem");
     props.openaiApiKeySecret.grantRead(worker);
     props.telegramBotTokenSecret.grantRead(worker);
 

@@ -33,4 +33,6 @@ export interface MessageBody {
   timestamp: number;
   replyToMessageId?: number;
   replyToIsBot?: boolean;
+  chatType?: "private" | "group" | "supergroup";
+  replyToText?: string;
 }

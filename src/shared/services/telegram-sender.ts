@@ -2,7 +2,7 @@ interface SendMessageParams {
   token: string;
   chatId: number;
   text: string;
-  replyToMessageId: number;
+  replyToMessageId?: number;
 }
 
 type SendMessageResult =
@@ -22,10 +22,12 @@ export async function sendMessage(
       body: JSON.stringify({
         chat_id: chatId,
         text,
-        reply_parameters: {
-          message_id: replyToMessageId,
-          allow_sending_without_reply: true,
-        },
+        ...(replyToMessageId !== undefined && {
+          reply_parameters: {
+            message_id: replyToMessageId,
+            allow_sending_without_reply: true,
+          },
+        }),
       }),
     });
 

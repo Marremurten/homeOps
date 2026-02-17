@@ -10,6 +10,8 @@ const {
   mockGetLastResponseAt,
   mockIsConversationFast,
   mockValidateTone,
+  mockGetIgnoreRate,
+  mockGetInteractionFrequency,
 } = vi.hoisted(() => ({
   mockIsQuietHours: vi.fn().mockReturnValue(false),
   mockGetStockholmDate: vi.fn().mockReturnValue("2026-02-17"),
@@ -17,6 +19,8 @@ const {
   mockGetLastResponseAt: vi.fn().mockResolvedValue(null),
   mockIsConversationFast: vi.fn().mockResolvedValue(false),
   mockValidateTone: vi.fn().mockReturnValue({ valid: true }),
+  mockGetIgnoreRate: vi.fn().mockResolvedValue(null),
+  mockGetInteractionFrequency: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@shared/utils/stockholm-time.js", () => ({
@@ -35,6 +39,11 @@ vi.mock("@shared/services/fast-conversation.js", () => ({
 
 vi.mock("@shared/utils/tone-validator.js", () => ({
   validateTone: mockValidateTone,
+}));
+
+vi.mock("@shared/services/preference-tracker.js", () => ({
+  getIgnoreRate: mockGetIgnoreRate,
+  getInteractionFrequency: mockGetInteractionFrequency,
 }));
 
 // --- Import under test ---
@@ -92,6 +101,8 @@ describe("evaluateResponsePolicy", () => {
     mockGetLastResponseAt.mockResolvedValue(null);
     mockIsConversationFast.mockResolvedValue(false);
     mockValidateTone.mockReturnValue({ valid: true });
+    mockGetIgnoreRate.mockResolvedValue(null);
+    mockGetInteractionFrequency.mockResolvedValue(null);
   });
 
   // 1. type=none
@@ -360,6 +371,247 @@ describe("evaluateResponsePolicy", () => {
 
     it("exports COOLDOWN_MINUTES as a number equal to 15", () => {
       expect(COOLDOWN_MINUTES).toBe(15);
+    });
+  });
+
+  // 12. Preference-aware suppression
+  describe("preference-aware suppression", () => {
+    const PREF_PARAMS = {
+      homeopsTableName: "test-homeops",
+      userId: 42,
+    };
+
+    function callPolicyWithPrefs(
+      classificationOverrides: Partial<ClassificationResult> = {},
+      extraParams: Record<string, unknown> = {},
+    ) {
+      return callPolicy(classificationOverrides, {
+        ...PREF_PARAMS,
+        ...extraParams,
+      });
+    }
+
+    // -- Backward compatibility --
+    describe("backward compatibility (no homeopsTableName)", () => {
+      it("does not call preference-tracker when homeopsTableName is not provided", async () => {
+        await callPolicy({ confidence: 0.90 });
+
+        expect(mockGetIgnoreRate).not.toHaveBeenCalled();
+        expect(mockGetInteractionFrequency).not.toHaveBeenCalled();
+      });
+
+      it("returns acknowledgment normally when no homeopsTableName", async () => {
+        const result = await callPolicy({ confidence: 0.90 });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Noterat");
+      });
+    });
+
+    // -- Ignore rate suppression --
+    describe("high ignore rate suppresses acknowledgments", () => {
+      it("suppresses acknowledgment when ignore rate > 0.7 and sampleCount >= 10", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.75, sampleCount: 15 });
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result).toEqual({ respond: false, reason: "preference_suppressed" });
+      });
+
+      it("suppresses acknowledgment at ignore rate boundary (0.71, sampleCount = 10)", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.71, sampleCount: 10 });
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result).toEqual({ respond: false, reason: "preference_suppressed" });
+      });
+
+      it("does NOT suppress acknowledgment when ignore rate is exactly 0.7", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.7, sampleCount: 15 });
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Noterat");
+      });
+
+      it("does NOT suppress acknowledgment when sampleCount < 10", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.9, sampleCount: 9 });
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Noterat");
+      });
+
+      it("still sends clarifications even when ignore rate is high", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.85, sampleCount: 20 });
+
+        const result = await callPolicyWithPrefs({
+          confidence: 0.65,
+          activity: "tvätt",
+        });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Menade du");
+        expect(result.text).toContain("tvätt");
+      });
+
+      it("does NOT suppress when getIgnoreRate returns null", async () => {
+        mockGetIgnoreRate.mockResolvedValue(null);
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Noterat");
+      });
+    });
+
+    // -- Interaction frequency suppression --
+    describe("low interaction frequency suppresses clarifications", () => {
+      it("suppresses clarification when frequency < 1.0 and sampleCount >= 10", async () => {
+        mockGetInteractionFrequency.mockResolvedValue({ frequency: 0.5, sampleCount: 15 });
+
+        const result = await callPolicyWithPrefs({
+          confidence: 0.65,
+          activity: "disk",
+        });
+
+        expect(result).toEqual({ respond: false, reason: "low_frequency_suppressed" });
+      });
+
+      it("suppresses clarification at frequency boundary (0.99, sampleCount = 10)", async () => {
+        mockGetInteractionFrequency.mockResolvedValue({ frequency: 0.99, sampleCount: 10 });
+
+        const result = await callPolicyWithPrefs({
+          confidence: 0.65,
+          activity: "disk",
+        });
+
+        expect(result).toEqual({ respond: false, reason: "low_frequency_suppressed" });
+      });
+
+      it("does NOT suppress clarification when frequency is exactly 1.0", async () => {
+        mockGetInteractionFrequency.mockResolvedValue({ frequency: 1.0, sampleCount: 15 });
+
+        const result = await callPolicyWithPrefs({
+          confidence: 0.65,
+          activity: "tvätt",
+        });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Menade du");
+      });
+
+      it("does NOT suppress clarification when sampleCount < 10", async () => {
+        mockGetInteractionFrequency.mockResolvedValue({ frequency: 0.2, sampleCount: 5 });
+
+        const result = await callPolicyWithPrefs({
+          confidence: 0.65,
+          activity: "disk",
+        });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Menade du");
+      });
+
+      it("still sends acknowledgments even when frequency is low", async () => {
+        mockGetInteractionFrequency.mockResolvedValue({ frequency: 0.3, sampleCount: 20 });
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Noterat");
+      });
+
+      it("does NOT suppress when getInteractionFrequency returns null", async () => {
+        mockGetInteractionFrequency.mockResolvedValue(null);
+
+        const result = await callPolicyWithPrefs({
+          confidence: 0.65,
+          activity: "disk",
+        });
+
+        expect(result.respond).toBe(true);
+        expect(result.text).toContain("Menade du");
+      });
+    });
+
+    // -- Both preferences active --
+    describe("when both ignore rate and interaction frequency are active", () => {
+      it("suppresses acknowledgment via ignore rate even when frequency is also low", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.85, sampleCount: 20 });
+        mockGetInteractionFrequency.mockResolvedValue({ frequency: 0.3, sampleCount: 20 });
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result).toEqual({ respond: false, reason: "preference_suppressed" });
+      });
+
+      it("suppresses clarification via low frequency even when ignore rate is also high", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.85, sampleCount: 20 });
+        mockGetInteractionFrequency.mockResolvedValue({ frequency: 0.3, sampleCount: 20 });
+
+        const result = await callPolicyWithPrefs({
+          confidence: 0.65,
+          activity: "disk",
+        });
+
+        expect(result).toEqual({ respond: false, reason: "low_frequency_suppressed" });
+      });
+    });
+
+    // -- Preference checks happen after existing silence checks --
+    describe("preference checks do not override existing silence rules", () => {
+      it("quiet_hours still takes priority over preference suppression", async () => {
+        mockIsQuietHours.mockReturnValue(true);
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.9, sampleCount: 20 });
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result).toEqual({ respond: false, reason: "quiet_hours" });
+      });
+
+      it("daily_cap still takes priority over preference suppression", async () => {
+        mockGetResponseCount.mockResolvedValue(5);
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.9, sampleCount: 20 });
+
+        const result = await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(result).toEqual({ respond: false, reason: "daily_cap" });
+      });
+
+      it("preference functions are not called for type=none", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.9, sampleCount: 20 });
+
+        const result = await callPolicyWithPrefs({
+          type: "none",
+          confidence: 0.95,
+        });
+
+        expect(result).toEqual({ respond: false, reason: "none" });
+        expect(mockGetIgnoreRate).not.toHaveBeenCalled();
+        expect(mockGetInteractionFrequency).not.toHaveBeenCalled();
+      });
+    });
+
+    // -- Calls preference-tracker with correct arguments --
+    describe("passes correct arguments to preference-tracker", () => {
+      it("calls getIgnoreRate with homeopsTableName and userId as string", async () => {
+        mockGetIgnoreRate.mockResolvedValue({ rate: 0.5, sampleCount: 15 });
+
+        await callPolicyWithPrefs({ confidence: 0.90 });
+
+        expect(mockGetIgnoreRate).toHaveBeenCalledWith("test-homeops", "42");
+      });
+
+      it("calls getInteractionFrequency with homeopsTableName and userId as string", async () => {
+        mockGetInteractionFrequency.mockResolvedValue({ frequency: 2.0, sampleCount: 15 });
+
+        await callPolicyWithPrefs({ confidence: 0.65, activity: "disk" });
+
+        expect(mockGetInteractionFrequency).toHaveBeenCalledWith("test-homeops", "42");
+      });
     });
   });
 

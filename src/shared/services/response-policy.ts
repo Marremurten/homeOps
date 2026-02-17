@@ -3,11 +3,15 @@ import { isQuietHours, getStockholmDate } from "@shared/utils/stockholm-time.js"
 import { getResponseCount, getLastResponseAt } from "@shared/services/response-counter.js";
 import { isConversationFast } from "@shared/services/fast-conversation.js";
 import { validateTone } from "@shared/utils/tone-validator.js";
+import { getIgnoreRate, getInteractionFrequency } from "@shared/services/preference-tracker.js";
 
 export const CONFIDENCE_HIGH = 0.85;
 export const CONFIDENCE_CLARIFY = 0.50;
 export const DAILY_CAP = 3;
 export const COOLDOWN_MINUTES = 15;
+export const IGNORE_RATE_THRESHOLD = 0.7;
+export const LOW_FREQUENCY_THRESHOLD = 1.0;
+export const MIN_DATA_POINTS = 10;
 
 interface PolicyParams {
   classification: ClassificationResult;
@@ -18,6 +22,8 @@ interface PolicyParams {
   countersTableName: string;
   botUsername?: string;
   messageText?: string;
+  homeopsTableName?: string;
+  userId?: number;
 }
 
 interface PolicyResult {
@@ -36,6 +42,8 @@ export async function evaluateResponsePolicy(params: PolicyParams): Promise<Poli
     countersTableName,
     botUsername,
     messageText,
+    homeopsTableName,
+    userId,
   } = params;
 
   // 1. type === "none" -> early exit, no other checks
@@ -81,14 +89,46 @@ export async function evaluateResponsePolicy(params: PolicyParams): Promise<Poli
 
   // 6. Determine response text based on confidence
   let text: string;
+  let isAcknowledgment = false;
+  let isClarification = false;
   if (classification.confidence >= CONFIDENCE_HIGH) {
     text = "Noterat \u2713";
+    isAcknowledgment = true;
   } else if (classification.confidence >= CONFIDENCE_CLARIFY) {
     text = `Menade du ${classification.activity}?`;
+    isClarification = true;
   } else if (directlyAddressed) {
     text = `Menade du ${classification.activity}?`;
+    isClarification = true;
   } else {
     return { respond: false, reason: "low_confidence" };
+  }
+
+  // 7. Preference-aware suppression
+  if (homeopsTableName !== undefined && userId !== undefined) {
+    const userIdStr = String(userId);
+
+    if (isAcknowledgment) {
+      const ignoreData = await getIgnoreRate(homeopsTableName, userIdStr);
+      if (
+        ignoreData !== null &&
+        ignoreData.rate > IGNORE_RATE_THRESHOLD &&
+        ignoreData.sampleCount >= MIN_DATA_POINTS
+      ) {
+        return { respond: false, reason: "preference_suppressed" };
+      }
+    }
+
+    if (isClarification) {
+      const freqData = await getInteractionFrequency(homeopsTableName, userIdStr);
+      if (
+        freqData !== null &&
+        freqData.frequency < LOW_FREQUENCY_THRESHOLD &&
+        freqData.sampleCount >= MIN_DATA_POINTS
+      ) {
+        return { respond: false, reason: "low_frequency_suppressed" };
+      }
+    }
   }
 
   // 10. Tone validation

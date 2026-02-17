@@ -280,4 +280,182 @@ describe("classifyMessage", () => {
       expect(result).toEqual(FALLBACK_RESULT);
     });
   });
+
+  describe("context-enriched classification", () => {
+    const SUCCESSFUL_PARSED: ClassificationResult = {
+      type: "chore",
+      activity: "disk",
+      effort: "medium",
+      confidence: 0.92,
+    };
+
+    function mockSuccessfulParse() {
+      mockParse.mockResolvedValueOnce({
+        choices: [{ message: { parsed: SUCCESSFUL_PARSED } }],
+      });
+    }
+
+    function getSystemPromptContent(): string {
+      const callArgs = mockParse.mock.calls[0][0];
+      const systemMessage = callArgs.messages.find(
+        (m: { role: string; content: string }) => m.role === "system",
+      );
+      return systemMessage.content;
+    }
+
+    describe("aliases context", () => {
+      it("includes 'Vocabulary context' section in system prompt when aliases are provided", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, {
+          aliases: [
+            { alias: "disken", canonicalActivity: "diska" },
+            { alias: "moppat", canonicalActivity: "moppa golv" },
+          ],
+        });
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).toContain("Vocabulary context");
+      });
+
+      it("lists each alias mapping in the system prompt", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, {
+          aliases: [
+            { alias: "disken", canonicalActivity: "diska" },
+            { alias: "moppat", canonicalActivity: "moppa golv" },
+          ],
+        });
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).toContain("disken");
+        expect(systemPrompt).toContain("diska");
+        expect(systemPrompt).toContain("moppat");
+        expect(systemPrompt).toContain("moppa golv");
+      });
+
+      it("includes a single alias mapping when only one alias is provided", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, {
+          aliases: [{ alias: "tvätten", canonicalActivity: "tvätta" }],
+        });
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).toContain("Vocabulary context");
+        expect(systemPrompt).toContain("tvätten");
+        expect(systemPrompt).toContain("tvätta");
+      });
+
+      it("does not include 'Vocabulary context' section when aliases array is empty", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, { aliases: [] });
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).not.toContain("Vocabulary context");
+      });
+    });
+
+    describe("effort EMA context", () => {
+      it("includes 'Historical effort context' section in system prompt when effortEma is provided", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, {
+          effortEma: { activity: "diska", ema: 2.3 },
+        });
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).toContain("Historical effort context");
+      });
+
+      it("includes the activity name and EMA value in the system prompt", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, {
+          effortEma: { activity: "diska", ema: 2.3 },
+        });
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).toContain("diska");
+        expect(systemPrompt).toContain("2.3");
+      });
+
+      it("does not include 'Historical effort context' when effortEma is not provided", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, {
+          aliases: [{ alias: "disken", canonicalActivity: "diska" }],
+        });
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).not.toContain("Historical effort context");
+      });
+    });
+
+    describe("combined context", () => {
+      it("includes both 'Vocabulary context' and 'Historical effort context' when both are provided", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, {
+          aliases: [{ alias: "disken", canonicalActivity: "diska" }],
+          effortEma: { activity: "diska", ema: 1.8 },
+        });
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).toContain("Vocabulary context");
+        expect(systemPrompt).toContain("Historical effort context");
+      });
+
+      it("still returns the parsed classification result when context is provided", async () => {
+        mockSuccessfulParse();
+
+        const result = await classifyMessage(MESSAGE_TEXT, API_KEY, {
+          aliases: [{ alias: "disken", canonicalActivity: "diska" }],
+          effortEma: { activity: "diska", ema: 1.8 },
+        });
+
+        expect(result).toEqual(SUCCESSFUL_PARSED);
+      });
+    });
+
+    describe("backward compatibility (no context)", () => {
+      it("does not include 'Vocabulary context' when no context parameter is passed", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY);
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).not.toContain("Vocabulary context");
+      });
+
+      it("does not include 'Historical effort context' when no context parameter is passed", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY);
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).not.toContain("Historical effort context");
+      });
+
+      it("does not include context sections when context is an empty object", async () => {
+        mockSuccessfulParse();
+
+        await classifyMessage(MESSAGE_TEXT, API_KEY, {});
+
+        const systemPrompt = getSystemPromptContent();
+        expect(systemPrompt).not.toContain("Vocabulary context");
+        expect(systemPrompt).not.toContain("Historical effort context");
+      });
+
+      it("still returns the parsed result when no context is provided", async () => {
+        mockSuccessfulParse();
+
+        const result = await classifyMessage(MESSAGE_TEXT, API_KEY);
+
+        expect(result).toEqual(SUCCESSFUL_PARSED);
+      });
+    });
+  });
 });

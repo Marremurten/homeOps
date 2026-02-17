@@ -44,11 +44,15 @@ export async function handler(event: {
       userName: from.username ?? from.first_name,
       text: message.text,
       timestamp: message.date,
+      chatType: message.chat.type,
     };
 
     if (message.reply_to_message) {
       messageBody.replyToMessageId = message.reply_to_message.message_id;
       messageBody.replyToIsBot = message.reply_to_message.from?.is_bot ?? false;
+      if (message.reply_to_message.text) {
+        messageBody.replyToText = message.reply_to_message.text;
+      }
     }
 
     const command = new SendMessageCommand({

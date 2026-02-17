@@ -135,7 +135,7 @@ describe("dm-status service", () => {
 
       const { PutItemCommand } = await import("@aws-sdk/client-dynamodb");
       expect(PutItemCommand).toHaveBeenCalledOnce();
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       expect(putInput.TableName).toBe(TABLE_NAME);
     });
 
@@ -145,7 +145,7 @@ describe("dm-status service", () => {
       await setDmOptedIn(TABLE_NAME, USER_ID, PRIVATE_CHAT_ID);
 
       const { PutItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string }>;
       expect(item.PK).toEqual({ S: `DM#${USER_ID}` });
       expect(item.SK).toEqual({ S: "STATUS" });
@@ -157,7 +157,7 @@ describe("dm-status service", () => {
       await setDmOptedIn(TABLE_NAME, USER_ID, PRIVATE_CHAT_ID);
 
       const { PutItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { BOOL?: boolean }>;
       expect(item.optedIn).toEqual({ BOOL: true });
     });
@@ -168,7 +168,7 @@ describe("dm-status service", () => {
       await setDmOptedIn(TABLE_NAME, USER_ID, PRIVATE_CHAT_ID);
 
       const { PutItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { N?: string }>;
       expect(item.privateChatId).toEqual({ N: String(PRIVATE_CHAT_ID) });
     });
@@ -179,7 +179,7 @@ describe("dm-status service", () => {
       await setDmOptedIn(TABLE_NAME, USER_ID, PRIVATE_CHAT_ID);
 
       const { PutItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const putInput = vi.mocked(PutItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const item = putInput.Item as Record<string, { S?: string }>;
       expect(item.optedInAt).toBeDefined();
       expect(item.optedInAt.S).toBeDefined();
@@ -227,7 +227,7 @@ describe("dm-status service", () => {
       await markPrompted(TABLE_NAME, USER_ID);
 
       const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const updateExpr = call.UpdateExpression as string;
 
       expect(updateExpr).toContain("prompted");
@@ -239,7 +239,7 @@ describe("dm-status service", () => {
       await markPrompted(TABLE_NAME, USER_ID);
 
       const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
-      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as Record<string, unknown>;
+      const call = vi.mocked(UpdateItemCommand).mock.calls[0][0] as unknown as Record<string, unknown>;
       const exprValues = call.ExpressionAttributeValues as Record<string, { BOOL?: boolean }>;
 
       // Find the prompted value in expression attribute values

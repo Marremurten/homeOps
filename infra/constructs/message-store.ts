@@ -51,6 +51,12 @@ export class MessageStore extends Construct {
       sortKey: { name: "timestamp", type: dynamodb.AttributeType.NUMBER },
     });
 
+    this.activitiesTable.addGlobalSecondaryIndex({
+      indexName: "chatId-activity-index",
+      partitionKey: { name: "chatId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "activityTimestamp", type: dynamodb.AttributeType.STRING },
+    });
+
     this.responseCountersTable = new dynamodb.Table(
       this,
       "ResponseCountersTable",

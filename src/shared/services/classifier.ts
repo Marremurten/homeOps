@@ -45,6 +45,10 @@ Examples:
 export async function classifyMessage(
   text: string,
   apiKey: string,
+  context?: {
+    aliases?: Array<{ alias: string; canonicalActivity: string }>;
+    effortEma?: { activity: string; ema: number };
+  },
 ): Promise<ClassificationResult> {
   try {
     const client = new OpenAI({
@@ -52,13 +56,26 @@ export async function classifyMessage(
       timeout: 10_000,
     });
 
+    let systemPrompt = SYSTEM_PROMPT;
+
+    if (context?.aliases && context.aliases.length > 0) {
+      const aliasLines = context.aliases
+        .map((a) => `- "${a.alias}" means "${a.canonicalActivity}"`)
+        .join("\n");
+      systemPrompt += `\n\nVocabulary context:\n${aliasLines}`;
+    }
+
+    if (context?.effortEma) {
+      systemPrompt += `\n\nHistorical effort context:\nThe activity "${context.effortEma.activity}" has a historical effort EMA of ${context.effortEma.ema}.`;
+    }
+
     const response = await client.chat.completions.parse({
       model: CLASSIFICATION_MODEL,
       temperature: 0.2,
       max_completion_tokens: 200,
       response_format: zodResponseFormat(ClassificationSchema, "classification"),
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: text },
       ],
     });

@@ -1,16 +1,15 @@
 import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import type { SQSEvent } from "aws-lambda";
+import type { MessageBody } from "@shared/types/classification.js";
+import { classifyMessage } from "@shared/services/classifier.js";
+import { saveActivity } from "@shared/services/activity-store.js";
+import { evaluateResponsePolicy } from "@shared/services/response-policy.js";
+import { sendMessage, getBotInfo } from "@shared/services/telegram-sender.js";
+import { incrementResponseCount } from "@shared/services/response-counter.js";
+import { getStockholmDate } from "@shared/utils/stockholm-time.js";
+import { getSecret } from "@shared/utils/secrets.js";
 
 const client = new DynamoDBClient({});
-
-interface MessageBody {
-  chatId: string;
-  messageId: number;
-  userId: number;
-  userName: string;
-  text: string;
-  timestamp: number;
-}
 
 export async function handler(event: SQSEvent): Promise<void> {
   for (const record of event.Records) {
@@ -43,9 +42,87 @@ export async function handler(event: SQSEvent): Promise<void> {
         error.name === "ConditionalCheckFailedException"
       ) {
         // Idempotent: item already exists, treat as success
-        continue;
+      } else {
+        throw error;
       }
-      throw error;
+    }
+
+    // --- Classification pipeline ---
+
+    // Step 1: Classify
+    let classification;
+    try {
+      const apiKey = await getSecret(process.env.OPENAI_API_KEY_ARN!);
+      classification = await classifyMessage(body.text, apiKey);
+    } catch (err) {
+      console.error("Classification failed:", err);
+      continue;
+    }
+
+    // Step 2: Skip if type is "none"
+    if (classification.type === "none") {
+      continue;
+    }
+
+    // Step 3: Store activity
+    try {
+      await saveActivity({
+        tableName: process.env.ACTIVITIES_TABLE_NAME!,
+        chatId: body.chatId,
+        messageId: body.messageId,
+        userId: body.userId,
+        userName: body.userName,
+        classification,
+        timestamp: body.timestamp,
+      });
+    } catch (err) {
+      console.error("saveActivity failed:", err);
+    }
+
+    // Step 4: Evaluate response policy
+    let policyResult;
+    try {
+      const token = await getSecret(process.env.TELEGRAM_BOT_TOKEN_ARN!);
+      const botInfo = await getBotInfo(token);
+      policyResult = await evaluateResponsePolicy({
+        classification,
+        chatId: body.chatId,
+        senderUserId: body.userId,
+        currentTimestamp: body.timestamp,
+        messagesTableName: process.env.MESSAGES_TABLE_NAME!,
+        countersTableName: process.env.RESPONSE_COUNTERS_TABLE_NAME!,
+        botUsername: botInfo.username,
+        messageText: body.text,
+      });
+    } catch (err) {
+      console.error("evaluateResponsePolicy failed:", err);
+      continue;
+    }
+
+    // Step 5: Respond if policy says so
+    if (policyResult.respond && policyResult.text) {
+      try {
+        const token = await getSecret(process.env.TELEGRAM_BOT_TOKEN_ARN!);
+        const result = await sendMessage({
+          token,
+          chatId: Number(body.chatId),
+          text: policyResult.text,
+          replyToMessageId: body.messageId,
+        });
+
+        if (result.ok) {
+          const stockholmDate = getStockholmDate(
+            new Date(body.timestamp * 1000),
+          );
+          await incrementResponseCount(
+            process.env.RESPONSE_COUNTERS_TABLE_NAME!,
+            body.chatId,
+            stockholmDate,
+          );
+        }
+      } catch (err) {
+        console.error("Telegram send/increment failed:", err);
+      }
     }
   }
 }

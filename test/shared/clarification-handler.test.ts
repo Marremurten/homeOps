@@ -65,8 +65,7 @@ describe("clarification-handler", () => {
         userReplyText: "ja",
       });
 
-      expect(result.handled).toBe(true);
-      expect(result.activity).toBe("diskning");
+      expect(result).toEqual(expect.objectContaining({ handled: true, activity: "diskning" }));
     });
 
     it("extracts multi-word activities from 'Menade du ta hand om barn?'", async () => {
@@ -79,8 +78,7 @@ describe("clarification-handler", () => {
         userReplyText: "ja",
       });
 
-      expect(result.handled).toBe(true);
-      expect(result.activity).toBe("ta hand om barn");
+      expect(result).toEqual(expect.objectContaining({ handled: true, activity: "ta hand om barn" }));
     });
   });
 
@@ -154,8 +152,7 @@ describe("clarification-handler", () => {
           userReplyText: word,
         });
 
-        expect(result.handled).toBe(true);
-        expect(result.action).toBe("confirmed");
+        expect(result).toEqual(expect.objectContaining({ handled: true, action: "confirmed" }));
       }
     });
 

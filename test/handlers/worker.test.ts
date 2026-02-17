@@ -14,6 +14,19 @@ const {
   mockEvaluateResponsePolicy,
   mockGetSecret,
   MockUpdateItemCommand,
+  mockResolveAliases,
+  mockGetEffortEma,
+  mockUpdateEffortEma,
+  mockUpdatePatternHabit,
+  mockUpdateInteractionFrequency,
+  mockUpdateIgnoreRate,
+  mockGetIgnoreRate,
+  mockGetDmStatus,
+  mockSetDmOptedIn,
+  mockMarkPrompted,
+  mockRouteResponse,
+  mockHandleClarificationReply,
+  mockQueryLastActivity,
 } = vi.hoisted(() => ({
   mockSend: vi.fn(),
   mockClassifyMessage: vi.fn(),
@@ -29,6 +42,19 @@ const {
   MockUpdateItemCommand: vi.fn().mockImplementation(function (input: unknown) {
     return { input };
   }),
+  mockResolveAliases: vi.fn(),
+  mockGetEffortEma: vi.fn(),
+  mockUpdateEffortEma: vi.fn(),
+  mockUpdatePatternHabit: vi.fn(),
+  mockUpdateInteractionFrequency: vi.fn(),
+  mockUpdateIgnoreRate: vi.fn(),
+  mockGetIgnoreRate: vi.fn(),
+  mockGetDmStatus: vi.fn(),
+  mockSetDmOptedIn: vi.fn(),
+  mockMarkPrompted: vi.fn(),
+  mockRouteResponse: vi.fn(),
+  mockHandleClarificationReply: vi.fn(),
+  mockQueryLastActivity: vi.fn(),
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
@@ -70,6 +96,35 @@ vi.mock("@shared/services/response-policy.js", () => ({
 vi.mock("@shared/utils/secrets.js", () => ({
   getSecret: mockGetSecret,
 }));
+vi.mock("@shared/services/alias-resolver.js", () => ({
+  resolveAliases: mockResolveAliases,
+}));
+vi.mock("@shared/services/effort-tracker.js", () => ({
+  getEffortEma: mockGetEffortEma,
+  updateEffortEma: mockUpdateEffortEma,
+}));
+vi.mock("@shared/services/pattern-tracker.js", () => ({
+  updatePatternHabit: mockUpdatePatternHabit,
+}));
+vi.mock("@shared/services/preference-tracker.js", () => ({
+  updateInteractionFrequency: mockUpdateInteractionFrequency,
+  updateIgnoreRate: mockUpdateIgnoreRate,
+  getIgnoreRate: mockGetIgnoreRate,
+}));
+vi.mock("@shared/services/dm-status.js", () => ({
+  getDmStatus: mockGetDmStatus,
+  setDmOptedIn: mockSetDmOptedIn,
+  markPrompted: mockMarkPrompted,
+}));
+vi.mock("@shared/services/channel-router.js", () => ({
+  routeResponse: mockRouteResponse,
+}));
+vi.mock("@shared/services/clarification-handler.js", () => ({
+  handleClarificationReply: mockHandleClarificationReply,
+}));
+vi.mock("@shared/services/memory-query.js", () => ({
+  queryLastActivity: mockQueryLastActivity,
+}));
 
 function makeSqsEvent(bodyOverrides?: Partial<Record<string, unknown>>): SQSEvent {
   const body = {
@@ -107,6 +162,7 @@ describe("Worker Lambda handler", () => {
     process.env.MESSAGES_TABLE_NAME = "test-messages-table";
     process.env.ACTIVITIES_TABLE_NAME = "test-activities-table";
     process.env.RESPONSE_COUNTERS_TABLE_NAME = "test-counters-table";
+    process.env.HOMEOPS_TABLE_NAME = "test-homeops-table";
     process.env.OPENAI_API_KEY_ARN =
       "arn:aws:secretsmanager:eu-north-1:123:secret:openai-key";
     process.env.TELEGRAM_BOT_TOKEN_ARN =
@@ -128,6 +184,19 @@ describe("Worker Lambda handler", () => {
     mockSendTelegramMessage.mockResolvedValue({ ok: true, messageId: 999 });
     mockGetBotInfo.mockResolvedValue({ id: 123, username: "testbot" });
     mockIncrementResponseCount.mockResolvedValue(undefined);
+    mockResolveAliases.mockResolvedValue({ resolvedText: "Hello", appliedAliases: [] });
+    mockGetEffortEma.mockResolvedValue(null);
+    mockUpdateEffortEma.mockResolvedValue(undefined);
+    mockUpdatePatternHabit.mockResolvedValue(undefined);
+    mockUpdateInteractionFrequency.mockResolvedValue(undefined);
+    mockUpdateIgnoreRate.mockResolvedValue(undefined);
+    mockGetIgnoreRate.mockResolvedValue(null);
+    mockGetDmStatus.mockResolvedValue(null);
+    mockSetDmOptedIn.mockResolvedValue(undefined);
+    mockMarkPrompted.mockResolvedValue(undefined);
+    mockRouteResponse.mockReturnValue("group");
+    mockHandleClarificationReply.mockResolvedValue({ handled: false, reason: "not_clarification" });
+    mockQueryLastActivity.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -364,6 +433,7 @@ describe("Worker Lambda handler", () => {
       expect(mockClassifyMessage).toHaveBeenCalledWith(
         "Jag städade köket",
         "test-secret-value",
+        expect.anything(),
       );
     });
 
@@ -597,6 +667,141 @@ describe("Worker Lambda handler", () => {
 
       expect(mockGetSecret).toHaveBeenCalledWith(
         "arn:aws:secretsmanager:eu-north-1:123:secret:custom-bot-token",
+      );
+    });
+  });
+
+  describe("Phase 3: Learning pipeline integration", () => {
+    it("calls setDmOptedIn and sends welcome message for /start in private chat", async () => {
+      const handler = await importHandler();
+      await handler(makeSqsEvent({ chatType: "private", text: "/start" }));
+
+      expect(mockSetDmOptedIn).toHaveBeenCalledWith(
+        "test-homeops-table",
+        expect.any(String),
+        expect.any(Number),
+      );
+      expect(mockSendTelegramMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(""),
+        }),
+      );
+      expect(mockClassifyMessage).not.toHaveBeenCalled();
+    });
+
+    it("skips classification for non-/start private chat messages", async () => {
+      const handler = await importHandler();
+      await handler(makeSqsEvent({ chatType: "private", text: "hello" }));
+
+      expect(mockClassifyMessage).not.toHaveBeenCalled();
+      expect(mockSendTelegramMessage).not.toHaveBeenCalled();
+    });
+
+    it("calls handleClarificationReply when replying to bot clarification", async () => {
+      mockHandleClarificationReply.mockResolvedValue({
+        handled: true,
+        action: "confirmed",
+        activity: "diskning",
+      });
+
+      const handler = await importHandler();
+      await handler(
+        makeSqsEvent({
+          text: "Ja",
+          replyToIsBot: true,
+          replyToText: "Menade du diskning?",
+        }),
+      );
+
+      expect(mockHandleClarificationReply).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tableName: "test-homeops-table",
+          chatId: "-100123",
+          replyToText: "Menade du diskning?",
+        }),
+      );
+      expect(mockClassifyMessage).not.toHaveBeenCalled();
+    });
+
+    it("calls resolveAliases before classification", async () => {
+      mockResolveAliases.mockResolvedValue({
+        resolvedText: "jag diskning",
+        appliedAliases: [
+          { alias: "disk", canonicalActivity: "diskning" },
+        ],
+      });
+
+      const handler = await importHandler();
+      await handler(makeSqsEvent({ text: "jag disk" }));
+
+      expect(mockResolveAliases).toHaveBeenCalledWith(
+        "test-homeops-table",
+        "-100123",
+        "jag disk",
+      );
+      expect(mockClassifyMessage).toHaveBeenCalledWith(
+        "jag diskning",
+        expect.any(String),
+        expect.anything(),
+      );
+    });
+
+    it("passes effort EMA context to classifier when available", async () => {
+      mockGetEffortEma.mockResolvedValue({ ema: 2.5, sampleCount: 10 });
+      mockResolveAliases.mockResolvedValue({
+        resolvedText: "jag disk",
+        appliedAliases: [
+          { alias: "disk", canonicalActivity: "diskning" },
+        ],
+      });
+
+      const handler = await importHandler();
+      await handler(makeSqsEvent({ text: "jag disk" }));
+
+      expect(mockClassifyMessage).toHaveBeenCalledWith(
+        "jag disk",
+        expect.any(String),
+        expect.objectContaining({
+          aliases: [{ alias: "disk", canonicalActivity: "diskning" }],
+          effortEma: expect.objectContaining({ ema: 2.5 }),
+        }),
+      );
+    });
+
+    it("calls updateEffortEma, updatePatternHabit, and updateInteractionFrequency after saving activity", async () => {
+      mockClassifyMessage.mockResolvedValue({
+        type: "chore",
+        activity: "städa",
+        effort: "medium",
+        confidence: 0.92,
+      });
+      mockSaveActivity.mockResolvedValue("01HTESTACTIVITYID");
+
+      const handler = await importHandler();
+      await handler(makeSqsEvent());
+
+      expect(mockUpdateEffortEma).toHaveBeenCalled();
+      expect(mockUpdatePatternHabit).toHaveBeenCalled();
+      expect(mockUpdateInteractionFrequency).toHaveBeenCalled();
+    });
+
+    it("passes homeopsTableName and userId to evaluateResponsePolicy", async () => {
+      mockClassifyMessage.mockResolvedValue({
+        type: "chore",
+        activity: "städa",
+        effort: "medium",
+        confidence: 0.92,
+      });
+      mockSaveActivity.mockResolvedValue("01HTESTACTIVITYID");
+
+      const handler = await importHandler();
+      await handler(makeSqsEvent());
+
+      expect(mockEvaluateResponsePolicy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          homeopsTableName: "test-homeops-table",
+          userId: 111,
+        }),
       );
     });
   });

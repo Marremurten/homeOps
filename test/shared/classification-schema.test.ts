@@ -129,9 +129,6 @@ describe("Activity interface", () => {
     // We verify the module exports by constructing a conforming object
     // and checking it satisfies the shape. Since Activity is a TypeScript
     // interface, we test that we can import it and use it as a type.
-    const activity: typeof mod extends { Activity: infer A } ? A : never =
-      undefined as never;
-
     // The real test is that this file compiles with the Activity type.
     // We also assert the module exports the expected names.
     expect(mod).toHaveProperty("ClassificationSchema");
@@ -166,8 +163,6 @@ describe("Activity interface", () => {
   });
 
   it("allows optional botMessageId field", async () => {
-    const _mod = await import("@shared/types/classification.js");
-
     const activityWithBot = {
       chatId: "123",
       activityId: "01HJZZ00000000000000000000",

@@ -5,6 +5,8 @@ import { Construct } from "constructs";
 export class MessageStore extends Construct {
   public readonly messagesTable: dynamodb.Table;
   public readonly homeopsTable: dynamodb.Table;
+  public readonly activitiesTable: dynamodb.Table;
+  public readonly responseCountersTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string) {
     super(scope, id);
@@ -33,5 +35,34 @@ export class MessageStore extends Construct {
       partitionKey: { name: "gsi1pk", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "gsi1sk", type: dynamodb.AttributeType.STRING },
     });
+
+    this.activitiesTable = new dynamodb.Table(this, "ActivitiesTable", {
+      tableName: "homeops-activities",
+      partitionKey: { name: "chatId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "activityId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    this.activitiesTable.addGlobalSecondaryIndex({
+      indexName: "userId-timestamp-index",
+      partitionKey: { name: "userId", type: dynamodb.AttributeType.NUMBER },
+      sortKey: { name: "timestamp", type: dynamodb.AttributeType.NUMBER },
+    });
+
+    this.responseCountersTable = new dynamodb.Table(
+      this,
+      "ResponseCountersTable",
+      {
+        tableName: "homeops-response-counters",
+        partitionKey: { name: "chatId", type: dynamodb.AttributeType.STRING },
+        sortKey: { name: "date", type: dynamodb.AttributeType.STRING },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        pointInTimeRecovery: true,
+        timeToLiveAttribute: "ttl",
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
   }
 }

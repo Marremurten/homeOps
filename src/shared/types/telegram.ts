@@ -27,6 +27,7 @@ export interface TelegramMessage {
   entities?: MessageEntity[];
   photo?: unknown[];
   edit_date?: number;
+  reply_to_message?: TelegramMessage;
 }
 
 export interface TelegramUpdate {

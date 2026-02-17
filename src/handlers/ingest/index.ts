@@ -36,7 +36,7 @@ export async function handler(event: {
     const message = update.message!;
     const from = message.from!;
 
-    const messageBody = {
+    const messageBody: Record<string, unknown> = {
       chatId: message.chat.id,
       messageId: message.message_id,
       userId: from.id,
@@ -44,6 +44,11 @@ export async function handler(event: {
       text: message.text,
       timestamp: message.date,
     };
+
+    if (message.reply_to_message) {
+      messageBody.replyToMessageId = message.reply_to_message.message_id;
+      messageBody.replyToIsBot = message.reply_to_message.from?.is_bot ?? false;
+    }
 
     const command = new SendMessageCommand({
       QueueUrl: process.env.SQS_QUEUE_URL,

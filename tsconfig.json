@@ -8,10 +8,11 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": ".",
+    "baseUrl": ".",
     "paths": {
       "@shared/*": ["./src/shared/*"]
     }
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts", "infra/**/*.ts"],
   "exclude": ["node_modules", "cdk.out", "dist"]
 }

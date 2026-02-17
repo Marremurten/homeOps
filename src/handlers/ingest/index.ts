@@ -1,8 +1,8 @@
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import type { TelegramUpdate } from "@shared/types/telegram";
-import { isTextMessage } from "@shared/types/telegram";
+import type { TelegramUpdate } from "@shared/types/telegram.js";
+import { isTextMessage } from "@shared/types/telegram.js";
 
-let sqs: InstanceType<typeof SQSClient>;
+let sqs: SQSClient;
 
 export async function handler(event: {
   headers: Record<string, string>;
@@ -13,7 +13,7 @@ export async function handler(event: {
     if (!sqs) {
       sqs = new SQSClient({});
     }
-    const { getSecret } = await import("@shared/utils/secrets");
+    const { getSecret } = await import("@shared/utils/secrets.js");
     const secret = await getSecret(process.env.WEBHOOK_SECRET_ARN!);
 
     const token = event.headers["x-telegram-bot-api-secret-token"];
@@ -45,12 +45,12 @@ export async function handler(event: {
       timestamp: message.date,
     };
 
-    await sqs.send(
-      new SendMessageCommand({
-        QueueUrl: process.env.SQS_QUEUE_URL,
-        MessageBody: JSON.stringify(messageBody),
-      }),
-    );
+    const command = new SendMessageCommand({
+      QueueUrl: process.env.SQS_QUEUE_URL,
+      MessageBody: JSON.stringify(messageBody),
+    });
+
+    await sqs.send(command);
 
     return {
       statusCode: 200,

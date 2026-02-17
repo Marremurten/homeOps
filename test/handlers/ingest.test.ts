@@ -1,24 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // --- SQS mock setup ---
-const sqsSendMock = vi.fn();
+const { sqsSendMock, getSecretMock } = vi.hoisted(() => ({
+  sqsSendMock: vi.fn(),
+  getSecretMock: vi.fn(),
+}));
 
 vi.mock("@aws-sdk/client-sqs", () => {
   return {
-    SQSClient: vi.fn().mockImplementation(() => ({
-      send: sqsSendMock,
-    })),
-    SendMessageCommand: vi.fn().mockImplementation((input: unknown) => ({
-      _type: "SendMessageCommand",
-      input,
-    })),
+    SQSClient: vi.fn().mockImplementation(function () {
+      return { send: sqsSendMock };
+    }),
+    SendMessageCommand: vi.fn().mockImplementation(function (input: unknown) {
+      return { _type: "SendMessageCommand", input };
+    }),
   };
 });
 
 // --- Secrets mock setup ---
-const getSecretMock = vi.fn();
 
-vi.mock("@shared/utils/secrets", () => {
+vi.mock("@shared/utils/secrets.js", () => {
   return {
     getSecret: getSecretMock,
   };
@@ -81,11 +82,10 @@ function makeTextUpdate(overrides?: Partial<{
 describe("Ingest Lambda handler", () => {
   const originalEnv = { ...process.env };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.SQS_QUEUE_URL = TEST_QUEUE_URL;
     process.env.WEBHOOK_SECRET_ARN = TEST_SECRET_ARN;
-    sqsSendMock.mockReset();
-    getSecretMock.mockReset();
+    vi.clearAllMocks();
     getSecretMock.mockResolvedValue(VALID_TOKEN);
   });
 

@@ -8,7 +8,7 @@ describe("Project scaffolding", () => {
   });
 
   describe("tsconfig.json", () => {
-    it("compiles without errors", async () => {
+    it("compiles without errors", { timeout: 30_000 }, async () => {
       const { execFileSync } = await import("node:child_process");
       const result = execFileSync("npx", ["tsc", "--noEmit"], {
         cwd: process.cwd(),
@@ -22,17 +22,17 @@ describe("Project scaffolding", () => {
 
   describe("path alias @shared/types/telegram", () => {
     it("resolves the module", async () => {
-      const telegramModule = await import("@shared/types/telegram");
+      const telegramModule = await import("@shared/types/telegram.js");
       expect(telegramModule).toBeDefined();
     });
 
     it("exports isTextMessage type guard", async () => {
-      const { isTextMessage } = await import("@shared/types/telegram");
+      const { isTextMessage } = await import("@shared/types/telegram.js");
       expect(typeof isTextMessage).toBe("function");
     });
 
     it("exports expected Telegram types", async () => {
-      const mod = await import("@shared/types/telegram");
+      const mod = await import("@shared/types/telegram.js");
       // Verify the module has the expected shape -- type-level exports
       // won't be present at runtime, but isTextMessage should be
       expect(mod).toHaveProperty("isTextMessage");

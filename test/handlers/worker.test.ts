@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { SQSEvent } from "aws-lambda";
 
-const mockSend = vi.fn();
+const { mockSend } = vi.hoisted(() => ({
+  mockSend: vi.fn(),
+}));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: vi.fn().mockImplementation(() => ({
-    send: mockSend,
-  })),
-  PutItemCommand: vi.fn().mockImplementation((input: unknown) => ({ input })),
+  DynamoDBClient: vi.fn().mockImplementation(function () {
+    return { send: mockSend };
+  }),
+  PutItemCommand: vi.fn().mockImplementation(function (input: unknown) {
+    return { input };
+  }),
 }));
 
 function makeSqsEvent(bodyOverrides?: Partial<Record<string, unknown>>): SQSEvent {

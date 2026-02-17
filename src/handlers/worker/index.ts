@@ -1,17 +1,7 @@
 import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import type { SQSEvent } from "aws-lambda";
 
-// Vitest v4 mocks use arrow functions which cannot be called with `new`.
-// Cast to plain function types so tests work with mocked modules.
-const client = (
-  DynamoDBClient as unknown as (
-    config: Record<string, unknown>,
-  ) => { send: (cmd: unknown) => Promise<unknown> }
-)({});
-
-const createPutItemCommand = PutItemCommand as unknown as (
-  input: Record<string, unknown>,
-) => unknown;
+const client = new DynamoDBClient({});
 
 interface MessageBody {
   chatId: string;
@@ -28,7 +18,7 @@ export async function handler(event: SQSEvent): Promise<void> {
     const createdAt = new Date().toISOString();
     const ttl = Math.floor(Date.now() / 1000) + 90 * 24 * 60 * 60;
 
-    const command = createPutItemCommand({
+    const command = new PutItemCommand({
       TableName: process.env.MESSAGES_TABLE_NAME,
       ConditionExpression:
         "attribute_not_exists(chatId) AND attribute_not_exists(messageId)",

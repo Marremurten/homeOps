@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isTextMessage } from "@shared/types/telegram";
+import { isTextMessage } from "@shared/types/telegram.js";
 
 describe("isTextMessage type guard", () => {
   it("returns true for a valid text message update", () => {

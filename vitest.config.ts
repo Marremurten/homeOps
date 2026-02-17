@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
     globals: false,
+    clearMocks: true,
   },
   resolve: {
     alias: {

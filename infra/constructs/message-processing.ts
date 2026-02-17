@@ -6,6 +6,7 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 
@@ -13,6 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export interface MessageProcessingProps {
   messagesTable: dynamodb.ITable;
+  activitiesTable: dynamodb.ITable;
+  responseCountersTable: dynamodb.ITable;
+  openaiApiKeySecret: secretsmanager.ISecret;
+  telegramBotTokenSecret: secretsmanager.ISecret;
 }
 
 export class MessageProcessing extends Construct {
@@ -26,7 +31,7 @@ export class MessageProcessing extends Construct {
     });
 
     this.queue = new sqs.Queue(this, "Queue", {
-      visibilityTimeout: cdk.Duration.seconds(180),
+      visibilityTimeout: cdk.Duration.seconds(360),
       deadLetterQueue: {
         queue: dlq,
         maxReceiveCount: 3,
@@ -36,7 +41,7 @@ export class MessageProcessing extends Construct {
     const worker = new lambdaNodejs.NodejsFunction(this, "Worker", {
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(60),
       memorySize: 256,
       entry: path.join(__dirname, "../../src/handlers/worker/index.ts"),
       handler: "handler",
@@ -47,6 +52,10 @@ export class MessageProcessing extends Construct {
       },
       environment: {
         MESSAGES_TABLE_NAME: props.messagesTable.tableName,
+        ACTIVITIES_TABLE_NAME: props.activitiesTable.tableName,
+        RESPONSE_COUNTERS_TABLE_NAME: props.responseCountersTable.tableName,
+        OPENAI_API_KEY_ARN: props.openaiApiKeySecret.secretArn,
+        TELEGRAM_BOT_TOKEN_ARN: props.telegramBotTokenSecret.secretArn,
       },
     });
 
@@ -58,6 +67,11 @@ export class MessageProcessing extends Construct {
     );
 
     props.messagesTable.grant(worker, "dynamodb:PutItem");
+    props.messagesTable.grant(worker, "dynamodb:Query");
+    props.activitiesTable.grant(worker, "dynamodb:PutItem");
+    props.responseCountersTable.grant(worker, "dynamodb:GetItem", "dynamodb:UpdateItem");
+    props.openaiApiKeySecret.grantRead(worker);
+    props.telegramBotTokenSecret.grantRead(worker);
 
     new cloudwatch.Alarm(this, "DlqDepthAlarm", {
       metric: dlq.metricApproximateNumberOfMessagesVisible(),

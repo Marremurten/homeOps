@@ -3,5 +3,7 @@ export const config = {
   stackName: "HomeOpsStack",
   messagesTableName: "homeops-messages",
   homeopsTableName: "homeops",
+  activitiesTableName: "homeops-activities",
+  responseCountersTableName: "homeops-response-counters",
   logRetentionDays: 30,
 };

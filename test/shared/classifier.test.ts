@@ -8,17 +8,19 @@ const { mockZodResponseFormat } = vi.hoisted(() => ({
   mockZodResponseFormat: vi.fn().mockReturnValue({ type: "json_schema", json_schema: {} }),
 }));
 
-const MockOpenAI = vi.fn().mockImplementation(function () {
-  return {
-    beta: {
-      chat: {
-        completions: {
-          parse: mockParse,
+const { MockOpenAI } = vi.hoisted(() => ({
+  MockOpenAI: vi.fn().mockImplementation(function () {
+    return {
+      beta: {
+        chat: {
+          completions: {
+            parse: mockParse,
+          },
         },
       },
-    },
-  };
-});
+    };
+  }),
+}));
 
 vi.mock("openai", () => ({
   default: MockOpenAI,

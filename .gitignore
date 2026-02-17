@@ -1,0 +1,8 @@
+node_modules
+cdk.out
+dist
+.env
+
+# Compiled JS/declaration files in infra
+infra/**/*.js
+infra/**/*.d.ts

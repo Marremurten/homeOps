@@ -1,0 +1,40 @@
+{
+  "name": "homeops",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cdk": "cdk",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.23.0",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.991.0",
+    "@aws-sdk/client-secrets-manager": "^3.991.0",
+    "@aws-sdk/client-sqs": "^3.991.0",
+    "aws-cdk-lib": "^2.238.0",
+    "constructs": "^10.4.5"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
+    "aws-cdk": "^2.1106.0",
+    "esbuild": "^0.27.3",
+    "eslint": "^10.0.0",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

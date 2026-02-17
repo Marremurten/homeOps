@@ -21,8 +21,8 @@ describe("HomeOps Stack", () => {
   });
 
   describe("DynamoDB tables", () => {
-    it("contains exactly 2 DynamoDB tables", () => {
-      template.resourceCountIs("AWS::DynamoDB::Table", 2);
+    it("contains exactly 4 DynamoDB tables", () => {
+      template.resourceCountIs("AWS::DynamoDB::Table", 4);
     });
   });
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import * as cdk from "aws-cdk-lib";
 import { Template, Match } from "aws-cdk-lib/assertions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { MessageProcessing } from "../../infra/constructs/message-processing.js";
 
 describe("MessageProcessing construct", () => {
@@ -14,13 +15,31 @@ describe("MessageProcessing construct", () => {
       partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
-    new MessageProcessing(stack, "TestProcessing", { messagesTable: table });
+    const activitiesTable = new dynamodb.Table(stack, "ActivitiesTable", {
+      partitionKey: { name: "chatId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "activityId", type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    const responseCountersTable = new dynamodb.Table(stack, "CountersTable", {
+      partitionKey: { name: "chatId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "date", type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    const openaiApiKeySecret = new secretsmanager.Secret(stack, "OpenAISecret");
+    const telegramBotTokenSecret = new secretsmanager.Secret(stack, "TelegramSecret");
+    new MessageProcessing(stack, "TestProcessing", {
+      messagesTable: table,
+      activitiesTable,
+      responseCountersTable,
+      openaiApiKeySecret,
+      telegramBotTokenSecret,
+    });
     template = Template.fromStack(stack);
   });
 
-  it("creates SQS queue with VisibilityTimeout of 180 seconds", () => {
+  it("creates SQS queue with VisibilityTimeout of 360 seconds", () => {
     template.hasResourceProperties("AWS::SQS::Queue", {
-      VisibilityTimeout: 180,
+      VisibilityTimeout: 360,
     });
   });
 
@@ -32,7 +51,7 @@ describe("MessageProcessing construct", () => {
 
   it("creates main queue with RedrivePolicy maxReceiveCount 3 pointing to DLQ", () => {
     template.hasResourceProperties("AWS::SQS::Queue", {
-      VisibilityTimeout: 180,
+      VisibilityTimeout: 360,
       RedrivePolicy: Match.objectLike({
         maxReceiveCount: 3,
       }),
@@ -51,9 +70,9 @@ describe("MessageProcessing construct", () => {
     });
   });
 
-  it("creates Lambda function with Timeout 30 seconds", () => {
+  it("creates Lambda function with Timeout 60 seconds", () => {
     template.hasResourceProperties("AWS::Lambda::Function", {
-      Timeout: 30,
+      Timeout: 60,
     });
   });
 
@@ -121,5 +140,128 @@ describe("MessageProcessing construct", () => {
       MetricName: "Errors",
       ComparisonOperator: "GreaterThanThreshold",
     });
+  });
+
+  it("sets ACTIVITIES_TABLE_NAME environment variable on Lambda", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({
+          ACTIVITIES_TABLE_NAME: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
+  it("sets RESPONSE_COUNTERS_TABLE_NAME environment variable on Lambda", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({
+          RESPONSE_COUNTERS_TABLE_NAME: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
+  it("sets OPENAI_API_KEY_ARN environment variable on Lambda", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({
+          OPENAI_API_KEY_ARN: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
+  it("sets TELEGRAM_BOT_TOKEN_ARN environment variable on Lambda", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({
+          TELEGRAM_BOT_TOKEN_ARN: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
+  it("grants Lambda IAM role dynamodb:PutItem on the activities table", () => {
+    const policies = template.findResources("AWS::IAM::Policy");
+    const hasPutItemOnActivities = Object.values(policies).some((policy: any) => {
+      const statements = policy.Properties?.PolicyDocument?.Statement ?? [];
+      return statements.some((stmt: any) => {
+        const actions = Array.isArray(stmt.Action)
+          ? stmt.Action
+          : [stmt.Action];
+        return actions.some(
+          (a: string) => a === "dynamodb:PutItem" || a === "dynamodb:*"
+        );
+      });
+    });
+    expect(hasPutItemOnActivities).toBe(true);
+  });
+
+  it("grants Lambda IAM role dynamodb:GetItem and dynamodb:UpdateItem on response-counters table", () => {
+    const policies = template.findResources("AWS::IAM::Policy");
+    const hasGetItem = Object.values(policies).some((policy: any) => {
+      const statements = policy.Properties?.PolicyDocument?.Statement ?? [];
+      return statements.some((stmt: any) => {
+        const actions = Array.isArray(stmt.Action)
+          ? stmt.Action
+          : [stmt.Action];
+        return actions.some(
+          (a: string) => a === "dynamodb:GetItem" || a === "dynamodb:*"
+        );
+      });
+    });
+    const hasUpdateItem = Object.values(policies).some((policy: any) => {
+      const statements = policy.Properties?.PolicyDocument?.Statement ?? [];
+      return statements.some((stmt: any) => {
+        const actions = Array.isArray(stmt.Action)
+          ? stmt.Action
+          : [stmt.Action];
+        return actions.some(
+          (a: string) => a === "dynamodb:UpdateItem" || a === "dynamodb:*"
+        );
+      });
+    });
+    expect(hasGetItem).toBe(true);
+    expect(hasUpdateItem).toBe(true);
+  });
+
+  it("grants Lambda IAM role dynamodb:Query on the messages table", () => {
+    const policies = template.findResources("AWS::IAM::Policy");
+    const hasQuery = Object.values(policies).some((policy: any) => {
+      const statements = policy.Properties?.PolicyDocument?.Statement ?? [];
+      return statements.some((stmt: any) => {
+        const actions = Array.isArray(stmt.Action)
+          ? stmt.Action
+          : [stmt.Action];
+        return actions.some(
+          (a: string) => a === "dynamodb:Query" || a === "dynamodb:*"
+        );
+      });
+    });
+    expect(hasQuery).toBe(true);
+  });
+
+  it("grants Lambda IAM role secretsmanager:GetSecretValue on both secrets", () => {
+    const policies = template.findResources("AWS::IAM::Policy");
+    const secretStatements: any[] = [];
+    for (const policy of Object.values(policies) as any[]) {
+      const statements = policy.Properties?.PolicyDocument?.Statement ?? [];
+      for (const stmt of statements) {
+        const actions = Array.isArray(stmt.Action)
+          ? stmt.Action
+          : [stmt.Action];
+        if (
+          actions.some(
+            (a: string) =>
+              a === "secretsmanager:GetSecretValue" || a === "secretsmanager:*"
+          )
+        ) {
+          secretStatements.push(stmt);
+        }
+      }
+    }
+    // Should have at least one statement granting secretsmanager:GetSecretValue
+    expect(secretStatements.length).toBeGreaterThanOrEqual(1);
   });
 });

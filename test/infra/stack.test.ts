@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { App } from "aws-cdk-lib";
-import { Template, Match } from "aws-cdk-lib/assertions";
+import { Template } from "aws-cdk-lib/assertions";
 import { HomeOpsStack } from "../../infra/stack.js";
 
 describe("HomeOps Stack", () => {

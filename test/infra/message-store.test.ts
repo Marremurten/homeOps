@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, beforeAll } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Template, Match } from "aws-cdk-lib/assertions";
 import { MessageStore } from "../../infra/constructs/message-store.js";

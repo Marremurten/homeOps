@@ -13,7 +13,7 @@ export class HomeOpsStack extends cdk.Stack {
 
     const store = new MessageStore(this, "MessageStore");
 
-    const botTokenSecret = new secretsmanager.Secret(this, "BotTokenSecret", {
+    new secretsmanager.Secret(this, "BotTokenSecret", {
       secretName: "homeops/telegram-bot-token",
     });
 
@@ -21,13 +21,9 @@ export class HomeOpsStack extends cdk.Stack {
       secretName: "homeops/webhook-secret",
     });
 
-    const openaiApiKeySecret = new secretsmanager.Secret(
-      this,
-      "OpenAiApiKeySecret",
-      {
-        secretName: "homeops/openai-api-key",
-      },
-    );
+    new secretsmanager.Secret(this, "OpenAiApiKeySecret", {
+      secretName: "homeops/openai-api-key",
+    });
 
     const processing = new MessageProcessing(this, "MessageProcessing", {
       messagesTable: store.messagesTable,

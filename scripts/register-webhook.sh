@@ -24,8 +24,8 @@ set -euo pipefail
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-BOT_TOKEN_SECRET_NAME="${BOT_TOKEN_SECRET_NAME:-homeops/telegram/bot-token}"
-WEBHOOK_SECRET_NAME="${WEBHOOK_SECRET_NAME:-homeops/telegram/webhook-secret}"
+BOT_TOKEN_SECRET_NAME="${BOT_TOKEN_SECRET_NAME:-homeops/telegram-bot-token}"
+WEBHOOK_SECRET_NAME="${WEBHOOK_SECRET_NAME:-homeops/webhook-secret}"
 
 # ─── Help ─────────────────────────────────────────────────────────────────────
 

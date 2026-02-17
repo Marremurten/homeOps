@@ -208,6 +208,92 @@ describe("Ingest Lambda handler", () => {
     });
   });
 
+  // ---- Reply metadata ----
+
+  describe("reply metadata extraction", () => {
+    it("includes replyToMessageId and replyToIsBot when reply_to_message is present", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = {
+        update_id: 999,
+        message: {
+          message_id: 100,
+          date: 1700000000,
+          chat: { id: 12345, type: "private" },
+          from: { id: 67890, is_bot: false, first_name: "Test", username: "testuser" },
+          text: "Hello",
+          reply_to_message: {
+            message_id: 50,
+            date: 1699999000,
+            chat: { id: 12345, type: "private" },
+            from: { id: 99999, is_bot: true, first_name: "Bot" },
+            text: "Previous message",
+          },
+        },
+      };
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody.replyToMessageId).toBe(50);
+      expect(messageBody.replyToIsBot).toBe(true);
+    });
+
+    it("does not include replyToMessageId or replyToIsBot when there is no reply_to_message", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = makeTextUpdate();
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody).not.toHaveProperty("replyToMessageId");
+      expect(messageBody).not.toHaveProperty("replyToIsBot");
+    });
+
+    it("defaults replyToIsBot to false when reply_to_message has no from field", async () => {
+      sqsSendMock.mockResolvedValueOnce({});
+      const update = {
+        update_id: 999,
+        message: {
+          message_id: 100,
+          date: 1700000000,
+          chat: { id: 12345, type: "private" },
+          from: { id: 67890, is_bot: false, first_name: "Test", username: "testuser" },
+          text: "Hello",
+          reply_to_message: {
+            message_id: 50,
+            date: 1699999000,
+            chat: { id: 12345, type: "private" },
+            text: "Previous message",
+          },
+        },
+      };
+      const event = makeEvent({ token: VALID_TOKEN, body: update });
+
+      await handler(event);
+
+      expect(sqsSendMock).toHaveBeenCalledOnce();
+
+      const { SendMessageCommand } = await import("@aws-sdk/client-sqs");
+      const commandCall = vi.mocked(SendMessageCommand).mock.calls[0][0] as any;
+      const messageBody = JSON.parse(commandCall.MessageBody);
+
+      expect(messageBody.replyToMessageId).toBe(50);
+      expect(messageBody.replyToIsBot).toBe(false);
+    });
+  });
+
   // ---- SQS failure ----
 
   describe("SQS failure", () => {
